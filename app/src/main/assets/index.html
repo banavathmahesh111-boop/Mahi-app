@@ -2,16 +2,211 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Mahi</title>
 <style>
-  body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#2a0709,#050102 70%);color:#ff3a3a;font-family:system-ui,sans-serif}
-  h1{letter-spacing:8px;text-shadow:0 0 16px #ff1c1c;margin:0}
-  p{color:#ddd}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:#050102;color:#fff;font-family:system-ui,sans-serif}
+body{max-width:520px;margin:0 auto;padding:10px 10px 90px}
+.hdr{text-align:center;padding:6px 0}
+.t1{font-size:32px;font-weight:800;letter-spacing:6px;color:#ff3434;text-shadow:0 0 14px #ff1c1c}
+.t2{font-size:12px;color:#ccc;margin-top:3px}
+.stage{position:relative;width:100%;height:360px;margin-top:4px}
+.lines{position:absolute;left:0;top:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}
+.lines path{fill:none;stroke:#ff3a3a;stroke-width:1.6;stroke-dasharray:5 6;opacity:.9;filter:drop-shadow(0 0 4px #ff2a2a)}
+body[data-state=speaking] .lines path{stroke-width:2.4;animation:flow .6s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-22}}
+.hero{position:absolute;left:50%;top:70px;width:200px;z-index:2;transform:translateX(-50%);filter:drop-shadow(0 0 14px rgba(40,170,255,.55));animation:sway 7s ease-in-out infinite}
+body[data-state=listening] .hero{animation-duration:3s}
+body[data-state=thinking] .hero{animation-duration:1.6s}
+body[data-state=speaking] .hero{animation:hop .5s ease-in-out infinite alternate}
+@keyframes sway{0%,100%{transform:translateX(calc(-50% - 10px))}50%{transform:translateX(calc(-50% + 10px))}}
+@keyframes hop{from{transform:translateX(-50%) translateY(0)}to{transform:translateX(-50%) translateY(-14px)}}
+.bub{position:absolute;left:0;top:0;z-index:2;width:58px;height:36px;padding:8px 9px;border:1.5px solid #2fb4ff;border-radius:8px;background:rgba(40,170,255,.08);box-shadow:0 0 10px rgba(40,170,255,.6);display:flex;flex-direction:column;justify-content:center;gap:4px}
+.bub i{display:block;height:2px;background:#2fb4ff;box-shadow:0 0 4px #2fb4ff;border-radius:2px}
+.panel{position:absolute;z-index:3;padding:9px 10px;border:1.5px solid #ff2a2a;border-radius:12px;background:rgba(10,2,3,.9);box-shadow:0 0 12px rgba(255,40,40,.3)}
+#sysPanel{left:0;top:150px;width:40%}
+#planPanel{right:0;top:170px;width:45%}
+#onPanel{right:0;top:0;width:45%}
+.panel h2{font-size:11px;letter-spacing:1.5px;color:#ff4a4a;margin-bottom:6px}
+.line{font-size:13px;margin:5px 0;display:flex;justify-content:space-between;gap:4px}
+.st{font-size:13px;margin:5px 0;color:#777;display:flex;align-items:center;gap:6px}
+.st.on{color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;background:#2dff7a;box-shadow:0 0 6px #2dff7a;flex:none}
+.task{font-size:13px;margin:5px 0;display:flex;align-items:center;gap:7px}
+.ck{width:14px;height:14px;border:1.5px solid #c55;border-radius:50%;flex:none}
+.task.done .ck{background:#2dff7a;border-color:#2dff7a}
+.task.done span{opacity:.5;text-decoration:line-through}
+.mic{display:flex;align-items:center;justify-content:center;width:96px;height:96px;margin:12px auto;border-radius:50%;border:none;background:radial-gradient(circle at 50% 35%,#ff5a5a,#c8101c 60%,#7a0710);box-shadow:0 0 30px #ff2a2a}
+.mic:active{transform:scale(.97)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.tile{border:1.5px solid #ff2a2a;border-radius:10px;padding:16px 4px;text-align:center;font-size:12px;color:#ff8a8a;background:rgba(255,42,42,.05)}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;background:#050102;border-top:1px solid #6a1016;padding:12px 0 14px}
+.nav span{font-size:12px;color:#b77}
+.nav span.on{color:#ff3a3a;text-shadow:0 0 8px #ff2a2a}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#1a0507;border:1px solid #ff2a2a;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
 </style>
 </head>
-<body>
-  <h1>MAHI</h1>
-  <p>Test app is working</p>
+<body data-state="idle">
+
+<div class="hdr">
+  <div class="t1">MAHI</div>
+  <div class="t2">Your AI Assistant</div>
+</div>
+
+<div class="stage" id="stage">
+  <svg class="lines" id="lines">
+    <path id="p0"></path><path id="p1"></path><path id="p2"></path>
+  </svg>
+
+  <div class="bub"><i style="width:32px"></i><i style="width:22px"></i></div>
+  <div class="bub"><i style="width:26px"></i><i style="width:30px"></i></div>
+  <div class="bub"><i style="width:34px"></i><i style="width:18px"></i></div>
+  <div class="bub"><i style="width:28px"></i><i style="width:24px"></i></div>
+
+  <img class="hero" src="mahi-hero.png" alt="">
+
+  <div class="panel" id="onPanel">
+    <div class="st on"><span class="dot"></span>Online</div>
+    <div class="st" data-s="thinking">Thinking...</div>
+    <div class="st" data-s="listening">Listening...</div>
+    <div class="st" data-s="speaking">Speaking...</div>
+    <div class="st" data-s="idle">Ready</div>
+  </div>
+
+  <div class="panel" id="sysPanel">
+    <h2>SYSTEM INFO</h2>
+    <div class="line"><span>Battery</span><span id="bat">--</span></div>
+    <div class="line"><span>Wi-Fi</span><span id="wifi">--</span></div>
+    <div class="line"><span>Temp</span><span id="temp">--</span></div>
+  </div>
+
+  <div class="panel" id="planPanel">
+    <h2>TODAY'S PLAN</h2>
+    <div id="tasks"></div>
+  </div>
+</div>
+
+<button class="mic" id="mic">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+    <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+  </svg>
+</button>
+
+<div class="tiles">
+  <div class="tile">Study Mode</div>
+  <div class="tile">News</div>
+  <div class="tile">Tasks</div>
+  <div class="tile">Media Control</div>
+  <div class="tile">Weather</div>
+  <div class="tile">App Control</div>
+  <div class="tile">Agent Report</div>
+  <div class="tile">Settings</div>
+</div>
+
+<div class="nav">
+  <span class="on">Home</span>
+  <span>Stats</span>
+  <span>History</span>
+  <span>Settings</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const bubs = [...document.querySelectorAll('.bub')];
+const paths = [$('p0'), $('p1'), $('p2')];
+const targets = [$('onPanel'), $('planPanel'), $('sysPanel')];
+const speed = { idle: 0.25, listening: 0.7, thinking: 1.5, speaking: 2.6 };
+let state = 'idle', angle = 0, last = performance.now();
+
+function setState(s) {
+  state = s;
+  document.body.dataset.state = s;
+  document.querySelectorAll('#onPanel .st[data-s]').forEach(r => r.classList.toggle('on', r.dataset.s === s));
+}
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  angle += dt * speed[state];
+
+  const W = stage.clientWidth, H = stage.clientHeight;
+  const cx = W / 2, cy = 170, rx = Math.min(150, W * 0.38), ry = 105;
+  $('lines').setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const pts = bubs.map((b, i) => {
+    const a = angle + i * Math.PI / 2;
+    const x = cx + rx * Math.cos(a), y = cy + ry * Math.sin(a);
+    b.style.left = (x - 29) + 'px';
+    b.style.top = (y - 18) + 'px';
+    return [x, y];
+  });
+
+  paths.forEach((p, k) => {
+    const [bx, by] = pts[k];
+    const t = targets[k];
+    const tx = t.offsetLeft + t.offsetWidth / 2;
+    const ty = t.offsetTop + t.offsetHeight / 2;
+    p.setAttribute('d', `M${bx} ${by} Q${(bx + tx) / 2} ${(by + ty) / 2 - 40} ${tx} ${ty}`);
+  });
+
+  requestAnimationFrame(frame);
+}
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+const tasks = [
+  { t: 'Read Mahi report', d: false },
+  { t: 'Plan the day', d: false },
+  { t: 'Learn something new', d: false }
+];
+function renderTasks() {
+  const el = $('tasks');
+  el.innerHTML = '';
+  tasks.forEach(k => {
+    const d = document.createElement('div');
+    d.className = 'task' + (k.d ? ' done' : '');
+    d.innerHTML = '<i class="ck"></i><span></span>';
+    d.lastChild.textContent = k.t;
+    d.onclick = () => { k.d = !k.d; renderTasks(); };
+    el.appendChild(d);
+  });
+}
+
+// Live phone data will be sent here by the Android app in a later step
+window.setStatus = function (s) {
+  $('bat').textContent = s.battery + '%';
+  $('wifi').textContent = s.wifi;
+  $('temp').textContent = s.temp + ' C';
+};
+
+// Demo cycle until the voice step is built: listening, thinking, speaking, idle
+const seq = [['listening', 3000], ['thinking', 2000], ['speaking', 3500], ['idle', 0]];
+let tm = null;
+function demo(i) {
+  if (i >= seq.length) return;
+  setState(seq[i][0]);
+  if (seq[i][1]) tm = setTimeout(() => demo(i + 1), seq[i][1]);
+}
+$('mic').onclick = () => { clearTimeout(tm); demo(0); };
+
+document.querySelectorAll('.tile').forEach(t => {
+  t.onclick = () => toast(t.textContent.trim() + ' comes in a later step');
+});
+
+renderTasks();
+setState('idle');
+requestAnimationFrame(frame);
+</script>
 </body>
 </html>
