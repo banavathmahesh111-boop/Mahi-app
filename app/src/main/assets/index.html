@@ -1,406 +1,1845 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MAHI</title>
+
 <style>
-:root{--red:#ff2a2a;--red2:#ff5a5a;--blue:#2fb4ff;--green:#2dff7a}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{background:#050102;color:#fff;font-family:system-ui,Roboto,sans-serif}
-body{max-width:520px;margin:0 auto;min-height:100vh;padding:8px 10px 100px;overflow-x:hidden;background:radial-gradient(ellipse at 50% 22%,#241014 0,#070203 55%,#020101 100%)}
-svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:root{
+  --red:#ff2a2a;
+  --red2:#ff5a5a;
+  --blue:#2fb4ff;
+  --green:#2dff7a;
+}
 
-/* header */
-.top{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;margin-top:4px}
-.box{width:42px;height:42px;padding:9px;border:1.5px solid var(--red);border-radius:8px;background:none;color:var(--red);box-shadow:0 0 10px rgba(255,40,40,.5)}
-.brand{text-align:center}
-.title{font-size:40px;font-weight:900;font-style:italic;letter-spacing:4px;color:#ff3434;text-shadow:0 0 14px #ff1c1c,0 0 30px rgba(255,28,28,.5)}
-.sub{font-size:13px;letter-spacing:3px;font-weight:600;margin-top:2px}
-.tag{font-size:12px;color:#ddd;font-style:italic;margin-top:2px}
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  -webkit-tap-highlight-color:transparent;
+}
 
-/* shared panel */
-.panel{border:1.6px solid var(--red);border-radius:12px;padding:10px 12px;background:rgba(8,2,4,.85);box-shadow:0 0 14px rgba(255,40,40,.35),inset 0 0 12px rgba(255,40,40,.08)}
-.panel h3{font-size:12px;letter-spacing:1.6px;color:#ff4a4a;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.panel h3 svg{width:18px;height:18px;flex:none;color:var(--blue)}
-.ic{width:20px;height:20px;flex:none}
-.ic.green{color:var(--green)}
-.ic.blue{color:var(--blue)}
-.ic.red{color:var(--red2)}
-.row{display:flex;align-items:center;gap:8px;font-size:13px;margin:7px 0}
-.row b{font-weight:600}
+html,body{
+  background:#050102;
+  color:#fff;
+  font-family:system-ui,Roboto,sans-serif;
+}
 
-/* stage */
-.stage{display:grid;grid-template-columns:1fr 1.1fr 1fr;grid-template-rows:auto auto;gap:12px;margin-top:14px;align-items:start}
-.status{grid-column:1;grid-row:1}
-.modes{grid-column:3;grid-row:1}
-.plan{grid-column:3;grid-row:2}
-.center{grid-column:2;grid-row:1 / span 2;position:relative;min-height:330px}
-.hero{position:absolute;left:50%;top:0;width:220px;margin-left:-110px;z-index:2;filter:drop-shadow(0 0 16px rgba(40,170,255,.7));animation:sway 7s ease-in-out infinite}
-.plat{position:absolute;left:50%;bottom:4px;width:280px;height:90px;margin-left:-140px;z-index:1;background:radial-gradient(ellipse at center,rgba(60,190,255,.95) 0,rgba(30,130,255,.35) 38%,transparent 70%)}
-.plat::after{content:"";position:absolute;inset:20px 22px;border-radius:50%;border:2px solid var(--blue);box-shadow:0 0 16px var(--blue)}
+body{
+  max-width:520px;
+  margin:0 auto;
+  min-height:100vh;
+  padding:8px 10px 118px;
+  overflow-x:hidden;
 
-.mode{display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;color:#7a7a7a}
-.mode.on{color:#fff}
-.task{display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;line-height:1.25}
-.ck{width:16px;height:16px;flex:none;border:1.6px solid #c55;border-radius:50%}
-.task.done .ck{background:var(--green);border-color:var(--green);box-shadow:0 0 6px var(--green)}
-.task.done span:last-child{opacity:.55;text-decoration:line-through}
-.add{background:none;border:none;color:var(--red2);font-size:14px;font-weight:700;margin-top:4px;padding:0}
-.sp{flex:1;background:var(--green);border-radius:1px;opacity:.85}
-.spark{display:flex;align-items:flex-end;gap:2px;height:32px;margin-top:8px}
+  background:
+    radial-gradient(
+      ellipse at 50% 22%,
+      #241014 0,
+      #070203 55%,
+      #020101 100%
+    );
+}
 
-/* voice */
-.voice{position:relative;height:270px;margin-top:6px}
-.waves{position:absolute;left:0;right:0;top:0;bottom:60px;display:flex;align-items:center;justify-content:space-between;gap:2px;pointer-events:none}
-.wb{display:block;width:2px;border-radius:2px;transform-origin:center;animation:wv 1.2s ease-in-out infinite alternate}
-.wb.r{background:var(--red);box-shadow:0 0 5px var(--red)}
-.wb.b{background:var(--blue);box-shadow:0 0 5px var(--blue)}
-.micwrap{position:absolute;left:50%;top:10px;width:180px;height:180px;margin-left:-90px;z-index:2}
-.ring{position:absolute;border-radius:50%}
-.ring.a{inset:0;border:2.5px solid #5fd0ff;box-shadow:0 0 18px var(--blue),inset 0 0 14px rgba(47,180,255,.4)}
-.ring.b{inset:12px;border:2px dashed var(--red);animation:spin 14s linear infinite}
-.mic{position:absolute;left:24px;top:24px;width:132px;height:132px;border-radius:50%;border:none;color:#fff;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 30%,#8fdcff,#1e88e5 48%,#0b2a6b 100%);box-shadow:0 0 30px var(--blue),inset 0 0 18px rgba(255,255,255,.2)}
-.mic span{width:50px;height:50px}
-.mic svg{stroke-width:2.2}
-.mic:active{transform:scale(.97)}
-.tap{position:absolute;left:0;right:0;bottom:0;text-align:center}
-.tap b{display:block;font-size:17px}
-.tap span{font-size:14px;color:#ddd}
-.tap i{font-style:normal;color:var(--red);font-weight:700}
+svg{
+  width:100%;
+  height:100%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
 
-/* message bar */
-.msg{display:flex;align-items:center;gap:12px;border:1.6px solid var(--red);border-radius:14px;padding:8px 14px;margin-top:4px;box-shadow:0 0 14px rgba(255,40,40,.35)}
-.av{flex:none;width:64px;height:64px;border-radius:50%;border:2px solid var(--blue);box-shadow:0 0 10px var(--blue);background:#050a14 url(mahi-hero2.png) 50% 20%/175% no-repeat}
-.msg p{flex:1;min-width:0;font-size:16px;line-height:1.4}
-.msg p span{display:block}
-.eq{display:flex;align-items:flex-end;gap:4px;height:34px}
-.eb{width:4px;background:var(--blue);border-radius:2px;box-shadow:0 0 5px var(--blue);animation:wv 1s ease-in-out infinite alternate}
+/* =========================
+   HEADER
+========================= */
 
-/* bottom row */
-.bottom{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:10px;align-items:center;margin-top:14px}
-.focus p{font-size:11px;color:#bbb;margin:2px 0 6px}
-.fbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid var(--red);border-radius:8px;background:rgba(255,42,42,.08);color:#fff;font-size:13px}
-.fbtn span:first-child{width:11px;height:11px}
-.clock{width:136px;height:136px;margin:auto;border-radius:50%;border:5px solid var(--blue);box-shadow:0 0 18px var(--blue),inset 0 0 16px rgba(47,180,255,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-#time{font-size:30px;font-weight:800}
-#date{font-size:12px;color:#ddd;margin-top:3px}
-.quick h3 svg{color:var(--red2)}
-.qr{display:flex;align-items:center;gap:8px;font-size:12px;margin:8px 0;white-space:nowrap;cursor:pointer}
-.qr span{width:16px;height:16px;color:var(--red2);flex:none}
+.top{
+  display:grid;
+  grid-template-columns:44px 1fr 44px;
+  align-items:center;
+  margin-top:4px;
+}
 
-/* bottom navigation */
-.nav{position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px 12px;background:#050102;border-top:1px solid #6a1016;box-shadow:0 -6px 18px rgba(255,30,30,.2);z-index:9}
-.nav button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border:1.5px solid var(--blue);border-radius:10px;background:none;color:#ccc;font-size:12px;box-shadow:0 0 10px rgba(47,180,255,.4)}
-.nav button svg{width:26px;height:26px}
-.nav button.on{border-color:var(--red);color:#fff;box-shadow:0 0 12px rgba(255,40,40,.5)}
-.nav button.on svg{color:#ff3a3a}
+.box{
+  width:42px;
+  height:42px;
+  padding:9px;
+  border:1.5px solid var(--red);
+  border-radius:8px;
+  background:none;
+  color:var(--red);
+  box-shadow:0 0 10px rgba(255,40,40,.5);
+}
 
-.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:#1a0507;border:1px solid var(--red);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90%;text-align:center;z-index:20}
-.toast.show{opacity:1}
+.brand{
+  text-align:center;
+}
 
-/* animations and states */
-@keyframes sway{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
-@keyframes hop{from{transform:translateY(0)}to{transform:translateY(-16px)}}
-@keyframes wv{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-body[data-state=listening] .hero{animation:sway 2.8s ease-in-out infinite}
-body[data-state=thinking] .hero{animation:sway 1.4s ease-in-out infinite}
-body[data-state=speaking] .hero{animation:hop .42s ease-in-out infinite alternate}
-body[data-state=listening] .wb,body[data-state=listening] .eb{animation-duration:.8s}
-body[data-state=thinking] .wb,body[data-state=thinking] .eb{animation-duration:.5s}
-body[data-state=speaking] .wb,body[data-state=speaking] .eb{animation-duration:.35s}
-.hero{-webkit-mask-image:radial-gradient(ellipse at 50% 45%,#000 55%,transparent 78%);mask-image:radial-gradient(ellipse at 50% 45%,#000 55%,transparent 78%)}
-.plat{width:150px;height:46px;margin-left:-75px;bottom:4px}
-.plat::after{inset:10px 14px}
-.micwrap{width:130px;height:130px;margin-left:-65px;top:14px}
-.mic{left:17px;top:17px;width:96px;height:96px}
-.mic span{width:36px;height:36px}
-.voice{height:240px}
-.status,.plan,.modes{display:none}
-.stage{display:block;margin-top:0}
-.center{position:relative;height:360px;min-height:0;margin:6px 0}
-.hero{top:0;width:240px;margin-left:-120px}
-.plat{bottom:4px;width:240px;height:64px;margin-left:-120px}
-.plat{display:none}
-.hero{-webkit-mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 80%);mask-image:radial-gradient(ellipse at 50% 50%,#000 58%,transparent 80%)}
-.micwrap{width:130px;height:130px;margin-left:-65px}
-.mic{left:17px;top:17px;width:96px;height:96px}
-.hero{-webkit-mask-image:radial-gradient(closest-side,#000 62%,transparent 100%);mask-image:radial-gradient(closest-side,#000 62%,transparent 100%)}
-.center{height:240px;min-height:0;margin:0}
-.voice{margin-top:-6px}
-.voice{height:200px;margin-top:0}
-body{padding-bottom:124px}
-.bottom{grid-template-columns:1fr 1fr 1fr;gap:8px;margin:14px 0 28px}
-.focus,.quick{min-width:0;padding:10px 8px}
-.qr{font-size:11px;gap:5px;margin:7px 0}
-.qr span{width:14px;height:14px}
-.clock{width:118px;height:118px;margin:0 auto}
-.waves{gap:3px;bottom:70px}
-.wb{width:3px;border-radius:3px;animation-duration:1.4s}
-.wb.r{background:linear-gradient(to top,#ff2a2a,#ff9a9a);box-shadow:0 0 6px rgba(255,42,42,.7)}
-.wb.b{background:linear-gradient(to top,#2fb4ff,#a6ecff);box-shadow:0 0 6px rgba(47,180,255,.7)}
-.waves{gap:2px;bottom:60px}
-.wb{width:2px;border-radius:2px;animation-duration:1.2s}
-.wb.r{background:linear-gradient(to top,#ff2a2a,#ff9a9a);box-shadow:0 0 5px rgba(255,42,42,.7)}
-.wb.b{background:linear-gradient(to top,#2fb4ff,#a6ecff);box-shadow:0 0 5px rgba(47,180,255,.7)}
-body{padding-bottom:118px}
-.bottom{margin:14px 0 0}
+.title{
+  font-size:40px;
+  font-weight:900;
+  font-style:italic;
+  letter-spacing:4px;
+  color:#ff3434;
+  text-shadow:
+    0 0 14px #ff1c1c,
+    0 0 30px rgba(255,28,28,.5);
+}
+
+.sub{
+  font-size:13px;
+  letter-spacing:3px;
+  font-weight:600;
+  margin-top:2px;
+}
+
+.tag{
+  font-size:12px;
+  color:#ddd;
+  font-style:italic;
+  margin-top:2px;
+}
+
+/* =========================
+   PANELS
+========================= */
+
+.panel{
+  border:1.6px solid var(--red);
+  border-radius:12px;
+  padding:10px 12px;
+  background:rgba(8,2,4,.85);
+  box-shadow:
+    0 0 14px rgba(255,40,40,.35),
+    inset 0 0 12px rgba(255,40,40,.08);
+}
+
+.panel h3{
+  font-size:11px;
+  letter-spacing:1px;
+  color:#ff4a4a;
+  font-weight:700;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.panel h3 svg{
+  width:18px;
+  height:18px;
+  flex:none;
+  color:var(--blue);
+}
+
+.ic{
+  width:20px;
+  height:20px;
+  flex:none;
+}
+
+/* =========================
+   ROBOT VIDEO STAGE
+========================= */
+
+.stage{
+  display:block;
+  margin-top:0;
+}
+
+.center{
+  position:relative;
+  height:270px;
+  margin:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden;
+}
+
+/*
+  Video is the main robot display.
+  The video should be placed in:
+  app/src/main/assets/mahi-robot-gesture-demo.mp4
+*/
+
+.robot-video{
+  position:absolute;
+  width:100%;
+  max-width:390px;
+  height:270px;
+
+  object-fit:contain;
+
+  left:50%;
+  top:0;
+  transform:translateX(-50%);
+
+  z-index:2;
+
+  filter:
+    drop-shadow(0 0 12px rgba(40,170,255,.8))
+    drop-shadow(0 0 28px rgba(40,170,255,.35));
+
+  -webkit-mask-image:
+    radial-gradient(
+      ellipse at center,
+      #000 54%,
+      transparent 92%
+    );
+
+  mask-image:
+    radial-gradient(
+      ellipse at center,
+      #000 54%,
+      transparent 92%
+    );
+
+  pointer-events:none;
+}
+
+/*
+  Old image remains as fallback.
+*/
+.robot-fallback{
+  position:absolute;
+  width:220px;
+  height:250px;
+  object-fit:contain;
+  left:50%;
+  top:0;
+  transform:translateX(-50%);
+
+  z-index:1;
+
+  filter:
+    drop-shadow(0 0 16px rgba(40,170,255,.7));
+
+  -webkit-mask-image:
+    radial-gradient(
+      closest-side,
+      #000 62%,
+      transparent 100%
+    );
+
+  mask-image:
+    radial-gradient(
+      closest-side,
+      #000 62%,
+      transparent 100%
+    );
+}
+
+/*
+  Small status indicator.
+*/
+.robot-status{
+  position:absolute;
+  top:8px;
+  right:12px;
+  z-index:5;
+
+  padding:5px 9px;
+
+  border:1px solid rgba(47,180,255,.7);
+  border-radius:20px;
+
+  background:rgba(0,10,20,.75);
+
+  color:#7fdcff;
+
+  font-size:9px;
+  letter-spacing:1px;
+
+  box-shadow:
+    0 0 10px rgba(47,180,255,.35);
+
+  opacity:.8;
+}
+
+body[data-state="speaking"] .robot-status{
+  color:#ff6868;
+  border-color:var(--red);
+  box-shadow:0 0 12px rgba(255,40,40,.6);
+}
+
+/* speaking video glow */
+body[data-state="speaking"] .robot-video{
+  filter:
+    drop-shadow(0 0 18px rgba(40,170,255,1))
+    drop-shadow(0 0 35px rgba(40,170,255,.5));
+}
+
+/* listening */
+body[data-state="listening"] .robot-video{
+  filter:
+    drop-shadow(0 0 20px rgba(47,180,255,1));
+}
+
+/* thinking */
+body[data-state="thinking"] .robot-video{
+  filter:
+    drop-shadow(0 0 16px rgba(170,80,255,.8));
+}
+
+/* =========================
+   VOICE AREA
+========================= */
+
+.voice{
+  position:relative;
+  height:200px;
+  margin-top:0;
+}
+
+.waves{
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  bottom:60px;
+
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:2px;
+
+  pointer-events:none;
+}
+
+.wb{
+  display:block;
+  width:2px;
+  border-radius:2px;
+  transform-origin:center;
+  animation:wv 1.2s ease-in-out infinite alternate;
+}
+
+.wb.r{
+  background:linear-gradient(to top,#ff2a2a,#ff9a9a);
+  box-shadow:0 0 5px rgba(255,42,42,.7);
+}
+
+.wb.b{
+  background:linear-gradient(to top,#2fb4ff,#a6ecff);
+  box-shadow:0 0 5px rgba(47,180,255,.7);
+}
+
+.micwrap{
+  position:absolute;
+  left:50%;
+  top:10px;
+  width:130px;
+  height:130px;
+  margin-left:-65px;
+  z-index:2;
+}
+
+.ring{
+  position:absolute;
+  border-radius:50%;
+}
+
+.ring.a{
+  inset:0;
+  border:2.5px solid #5fd0ff;
+
+  box-shadow:
+    0 0 18px var(--blue),
+    inset 0 0 14px rgba(47,180,255,.4);
+}
+
+.ring.b{
+  inset:12px;
+  border:2px dashed var(--red);
+  animation:spin 14s linear infinite;
+}
+
+.mic{
+  position:absolute;
+  left:17px;
+  top:17px;
+  width:96px;
+  height:96px;
+
+  border-radius:50%;
+  border:none;
+
+  color:#fff;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  background:
+    radial-gradient(
+      circle at 50% 30%,
+      #8fdcff,
+      #1e88e5 48%,
+      #0b2a6b 100%
+    );
+
+  box-shadow:
+    0 0 30px var(--blue),
+    inset 0 0 18px rgba(255,255,255,.2);
+}
+
+.mic span{
+  width:36px;
+  height:36px;
+}
+
+.mic:active{
+  transform:scale(.97);
+}
+
+.tap{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  text-align:center;
+}
+
+.tap b{
+  display:block;
+  font-size:17px;
+}
+
+.tap span{
+  font-size:14px;
+  color:#ddd;
+}
+
+.tap i{
+  font-style:normal;
+  color:var(--red);
+  font-weight:700;
+}
+
+/* =========================
+   MESSAGE
+========================= */
+
+.msg{
+  display:flex;
+  align-items:center;
+  gap:12px;
+
+  border:1.6px solid var(--red);
+  border-radius:14px;
+
+  padding:8px 14px;
+  margin-top:4px;
+
+  box-shadow:0 0 14px rgba(255,40,40,.35);
+}
+
+.av{
+  flex:none;
+
+  width:64px;
+  height:64px;
+
+  border-radius:50%;
+
+  border:2px solid var(--blue);
+
+  box-shadow:0 0 10px var(--blue);
+
+  background:
+    #050a14
+    url(mahi-hero2.png)
+    50% 20%/175%
+    no-repeat;
+}
+
+.msg p{
+  flex:1;
+  min-width:0;
+
+  font-size:16px;
+  line-height:1.4;
+}
+
+.msg p span{
+  display:block;
+}
+
+.eq{
+  display:flex;
+  align-items:flex-end;
+  gap:4px;
+  height:34px;
+}
+
+.eb{
+  width:4px;
+  background:var(--blue);
+  border-radius:2px;
+
+  box-shadow:0 0 5px var(--blue);
+
+  animation:
+    wv 1s ease-in-out infinite alternate;
+}
+
+/* =========================
+   BOTTOM CARDS
+========================= */
+
+.bottom{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+
+  margin:14px 0 0;
+
+  align-items:center;
+}
+
+.focus,
+.quick{
+  min-width:0;
+  padding:10px 8px;
+}
+
+.focus p{
+  font-size:11px;
+  color:#bbb;
+  margin:2px 0 6px;
+}
+
+.fbtn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+
+  padding:7px 10px;
+
+  border:1.5px solid var(--red);
+  border-radius:8px;
+
+  background:rgba(255,42,42,.08);
+
+  color:#fff;
+
+  font-size:12px;
+}
+
+.fbtn span:first-child{
+  width:11px;
+  height:11px;
+}
+
+.clock{
+  width:118px;
+  height:118px;
+
+  margin:0 auto;
+
+  border-radius:50%;
+
+  border:5px solid var(--blue);
+
+  box-shadow:
+    0 0 18px var(--blue),
+    inset 0 0 16px rgba(47,180,255,.35);
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+
+  text-align:center;
+}
+
+#time{
+  font-size:28px;
+  font-weight:800;
+}
+
+#date{
+  font-size:12px;
+  color:#ddd;
+  margin-top:3px;
+}
+
+.quick h3 svg{
+  color:var(--red2);
+}
+
+.qr{
+  display:flex;
+  align-items:center;
+  gap:5px;
+
+  font-size:11px;
+
+  margin:7px 0;
+
+  white-space:nowrap;
+  cursor:pointer;
+}
+
+.qr span{
+  width:14px;
+  height:14px;
+  color:var(--red2);
+  flex:none;
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.nav{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+
+  max-width:520px;
+  margin:0 auto;
+
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+
+  padding:10px 12px 12px;
+
+  background:#050102;
+
+  border-top:1px solid #6a1016;
+
+  box-shadow:
+    0 -6px 18px rgba(255,30,30,.2);
+
+  z-index:9;
+}
+
+.nav button{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+
+  padding:8px 0;
+
+  border:1.5px solid var(--blue);
+  border-radius:10px;
+
+  background:none;
+
+  color:#ccc;
+
+  font-size:12px;
+
+  box-shadow:0 0 10px rgba(47,180,255,.4);
+}
+
+.nav button svg{
+  width:26px;
+  height:26px;
+}
+
+.nav button.on{
+  border-color:var(--red);
+  color:#fff;
+
+  box-shadow:
+    0 0 12px rgba(255,40,40,.5);
+}
+
+.nav button.on svg{
+  color:#ff3a3a;
+}
+
+/* =========================
+   TOAST
+========================= */
+
+.toast{
+  position:fixed;
+
+  left:50%;
+  bottom:100px;
+
+  transform:translateX(-50%);
+
+  background:#1a0507;
+
+  border:1px solid var(--red);
+
+  padding:10px 16px;
+
+  border-radius:10px;
+
+  font-size:14px;
+
+  opacity:0;
+
+  transition:opacity .25s;
+
+  pointer-events:none;
+
+  max-width:90%;
+
+  text-align:center;
+
+  z-index:20;
+}
+
+.toast.show{
+  opacity:1;
+}
+
+/* =========================
+   ANIMATIONS
+========================= */
+
+@keyframes wv{
+  from{
+    transform:scaleY(.35);
+  }
+  to{
+    transform:scaleY(1);
+  }
+}
+
+@keyframes spin{
+  to{
+    transform:rotate(360deg);
+  }
+}
+
+@keyframes pulse{
+  0%,100%{
+    transform:scale(1);
+  }
+
+  50%{
+    transform:scale(1.04);
+  }
+}
+
+/* =========================
+   STATE ANIMATIONS
+========================= */
+
+body[data-state="listening"] .mic{
+  animation:pulse .8s infinite;
+}
+
+body[data-state="thinking"] .mic{
+  animation:pulse 1.2s infinite;
+}
+
+body[data-state="speaking"] .mic{
+  animation:pulse .45s infinite;
+}
+
+body[data-state="listening"] .wb,
+body[data-state="listening"] .eb{
+  animation-duration:.8s;
+}
+
+body[data-state="thinking"] .wb,
+body[data-state="thinking"] .eb{
+  animation-duration:.5s;
+}
+
+body[data-state="speaking"] .wb,
+body[data-state="speaking"] .eb{
+  animation-duration:.35s;
+}
+
+/* =========================
+   MOBILE SCREEN FIX
+========================= */
+
+@media(max-height:760px){
+
+  .center{
+    height:225px;
+  }
+
+  .robot-video{
+    height:225px;
+  }
+
+  .robot-fallback{
+    height:220px;
+  }
+
+  .voice{
+    height:175px;
+  }
+
+  .micwrap{
+    transform:scale(.9);
+    transform-origin:top center;
+  }
+
+  .bottom{
+    margin-top:8px;
+  }
+
+  .clock{
+    width:100px;
+    height:100px;
+  }
+
+  #time{
+    font-size:24px;
+  }
+}
+
+@media(max-width:370px){
+
+  .title{
+    font-size:32px;
+  }
+
+  .center{
+    height:220px;
+  }
+
+  .robot-video{
+    height:220px;
+  }
+
+  .bottom{
+    grid-template-columns:1fr 90px 1fr;
+  }
+
+  .clock{
+    width:90px;
+    height:90px;
+    border-width:4px;
+  }
+
+  #time{
+    font-size:21px;
+  }
+
+  .quick .qr{
+    font-size:9px;
+  }
+}
 </style>
 </head>
+
 <body data-state="idle">
 
+<!-- =========================
+     HEADER
+========================= -->
+
 <header class="top">
-  <button class="box" data-i="menu" onclick="toast('Menu comes in a later step')"></button>
+
+  <button
+    class="box"
+    data-i="menu"
+    onclick="toast('Menu comes in a later step')">
+  </button>
+
   <div class="brand">
-    <div class="title">MAHI</div>
-    <div class="sub">AI ASSISTANT</div>
-    <div class="tag">Always With You</div>
+
+    <div class="title">
+      MAHI
+    </div>
+
+    <div class="sub">
+      AI ASSISTANT
+    </div>
+
+    <div class="tag">
+      Always With You
+    </div>
+
   </div>
-  <button class="box" data-i="gear" onclick="toast('Settings comes in a later step')"></button>
+
+  <button
+    class="box"
+    data-i="gear"
+    onclick="toast('Settings comes in a later step')">
+  </button>
+
 </header>
 
+
+<!-- =========================
+     ROBOT
+========================= -->
+
 <main class="stage">
-  <section class="panel status">
-    <h3>SYSTEM STATUS</h3>
-    <div class="row"><span class="ic green" data-i="check"></span>AI Online</div>
-    <div class="row"><span class="ic blue" data-i="wifi"></span>Wi-Fi Connected</div>
-    <div class="row"><span class="ic green" data-i="battery"></span>Battery: <b id="bat">--</b></div>
-    <div class="row"><span class="ic red" data-i="therm"></span>Temp: <b id="temp">--</b></div>
-    <div class="spark" id="spark"></div>
-  </section>
 
   <div class="center">
-    <div class="plat"></div>
-    <img class="hero" src="mahi-hero2.png" alt="MAHI robot">
+
+    <!--
+      REAL VIDEO ROBOT
+
+      File:
+      mahi-robot-gesture-demo.mp4
+
+      Put it inside:
+      app/src/main/assets/
+    -->
+
+    <video
+      id="robotVideo"
+      class="robot-video"
+      muted
+      playsinline
+      preload="auto"
+      loop>
+
+      <source
+        src="mahi-robot-gesture-demo.mp4"
+        type="video/mp4">
+
+    </video>
+
+
+    <!--
+      Fallback image if video is unavailable.
+    -->
+
+    <img
+      class="robot-fallback"
+      src="mahi-hero2.png"
+      alt="MAHI robot">
+
+
+    <div
+      class="robot-status"
+      id="robotStatus">
+      READY
+    </div>
+
   </div>
 
-  <section class="panel modes">
-    <h3><span data-i="brain"></span>AI MODES</h3>
-    <div class="mode" data-m="thinking"><span class="ic red" data-i="brain"></span>Thinking...</div>
-    <div class="mode" data-m="listening"><span class="ic blue" data-i="wave"></span>Listening...</div>
-    <div class="mode" data-m="speaking"><span class="ic blue" data-i="mic"></span>Speaking...</div>
-    <div class="mode" data-m="idle"><span class="ic green" data-i="check"></span>Ready</div>
-  </section>
-
-  <section class="panel plan">
-    <h3><span data-i="calendar"></span>TODAY'S PLAN</h3>
-    <div id="tasks"></div>
-    <button class="add" id="addTask">+ Add Task</button>
-  </section>
 </main>
 
+
+<!-- =========================
+     VOICE
+========================= -->
+
 <section class="voice">
-  <div class="waves" id="waves"></div>
-  <div class="micwrap">
-    <div class="ring a"></div>
-    <div class="ring b"></div>
-    <button class="mic" id="mic" aria-label="Speak"><span data-i="mic"></span></button>
+
+  <div
+    class="waves"
+    id="waves">
   </div>
-  <div class="tap"><b>Tap to Speak</b><span>or say <i>&ldquo;Hey MAHI&rdquo;</i></span></div>
+
+
+  <div class="micwrap">
+
+    <div class="ring a"></div>
+
+    <div class="ring b"></div>
+
+    <button
+      class="mic"
+      id="mic"
+      aria-label="Speak">
+
+      <span data-i="mic"></span>
+
+    </button>
+
+  </div>
+
+
+  <div class="tap">
+
+    <b>
+      Tap to Speak
+    </b>
+
+    <span>
+      or say
+      <i>
+        &ldquo;Hey MAHI&rdquo;
+      </i>
+    </span>
+
+  </div>
+
 </section>
+
+
+<!-- =========================
+     MESSAGE
+========================= -->
 
 <section class="msg">
+
   <div class="av"></div>
-  <p><span id="m1"></span><span id="m2"></span></p>
-  <div class="eq" id="eq"></div>
+
+  <p>
+
+    <span id="m1"></span>
+
+    <span id="m2"></span>
+
+  </p>
+
+  <div
+    class="eq"
+    id="eq">
+  </div>
+
 </section>
 
+
+<!-- =========================
+     BOTTOM
+========================= -->
+
 <div class="bottom">
+
   <section class="panel focus">
-    <h3><span data-i="target"></span>Focus Mode</h3>
-    <p>Block Distractions &bull; Boost Focus</p>
-    <button class="fbtn" id="focusBtn"><span data-i="play"></span><span id="focusTxt">Start Focus</span></button>
+
+    <h3>
+      <span data-i="target"></span>
+      Focus Mode
+    </h3>
+
+    <p>
+      Block Distractions &bull;
+      Boost Focus
+    </p>
+
+    <button
+      class="fbtn"
+      id="focusBtn">
+
+      <span data-i="play"></span>
+
+      <span id="focusTxt">
+        Start Focus
+      </span>
+
+    </button>
+
   </section>
-  <div class="clock"><div id="time">00:00</div><div id="date">--</div></div>
+
+
+  <div class="clock">
+
+    <div id="time">
+      00:00
+    </div>
+
+    <div id="date">
+      --
+    </div>
+
+  </div>
+
+
   <section class="panel quick">
-    <h3><span data-i="bolt"></span>Quick Actions</h3>
-    <div class="qr" id="qYt"><span data-i="yt"></span>Open YouTube</div>
-    <div class="qr" id="qPs"><span data-i="store"></span>Open Play Store</div>
-    <div class="qr" id="qSs"><span data-i="cam"></span>Take Screenshot</div>
+
+    <h3>
+
+      <span data-i="bolt"></span>
+
+      Quick Actions
+
+    </h3>
+
+
+    <div
+      class="qr"
+      id="qYt">
+
+      <span data-i="yt"></span>
+
+      Open YouTube
+
+    </div>
+
+
+    <div
+      class="qr"
+      id="qPs">
+
+      <span data-i="store"></span>
+
+      Open Play Store
+
+    </div>
+
+
+    <div
+      class="qr"
+      id="qSs">
+
+      <span data-i="cam"></span>
+
+      Take Screenshot
+
+    </div>
+
   </section>
+
 </div>
 
+
+<!-- =========================
+     NAV
+========================= -->
+
 <nav class="nav">
-  <button class="on" data-nav="home"><span data-i="home"></span>Home</button>
-  <button data-nav="stats"><span data-i="stats"></span>Stats</button>
-  <button data-nav="ai"><span data-i="cpu"></span>AI Models</button>
-  <button data-nav="hist"><span data-i="hist"></span>History</button>
+
+  <button
+    class="on"
+    data-nav="home">
+
+    <span data-i="home"></span>
+
+    Home
+
+  </button>
+
+
+  <button
+    data-nav="stats">
+
+    <span data-i="stats"></span>
+
+    Stats
+
+  </button>
+
+
+  <button
+    data-nav="ai">
+
+    <span data-i="cpu"></span>
+
+    AI Models
+
+  </button>
+
+
+  <button
+    data-nav="hist">
+
+    <span data-i="hist"></span>
+
+    History
+
+  </button>
+
 </nav>
 
-<div class="toast" id="toast"></div>
+
+<div
+  class="toast"
+  id="toast">
+</div>
+
 
 <script>
-const $ = id => document.getElementById(id);
+
+/* ==================================================
+   BASIC HELPERS
+================================================== */
+
+const $ = id =>
+  document.getElementById(id);
+
 const USER = 'Mahesh';
 
+
+/* ==================================================
+   ICONS
+================================================== */
+
 const ICONS = {
-  menu:'M3 6h18M3 12h18M3 18h18',
-  gear:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
-  brain:'M9 3a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3zM15 3a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3z',
-  wave:'M2 12h2M6 8v8M10 4v16M14 7v10M18 9v6M22 12h-2',
-  mic:'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8',
-  check:'M20 6L9 17l-5-5',
-  wifi:'M5 12.5a11 11 0 0 1 14 0M8.5 16a6 6 0 0 1 7 0M12 20h.01',
-  battery:'M2 7h17v10H2zM22 11v2M5 10v4M8 10v4M11 10v4',
-  therm:'M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z',
-  calendar:'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4',
-  target:'M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 2v4M12 18v4M2 12h4M18 12h4',
-  play:'M6 4l14 8-14 8z',
-  bolt:'M13 2L3 14h9l-1 8 10-12h-9z',
-  yt:'M3 6h18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM10 9l5 3-5 3z',
-  store:'M5 3l14 9-14 9zM5 3l8.5 9L5 21',
-  cam:'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
-  home:'M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
-  stats:'M18 20V10M12 20V4M6 20v-6',
-  cpu:'M6 6h12v12H6zM9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4',
-  hist:'M3 3v5h5M3.05 13A9 9 0 1 0 6 5.3L3 8M12 7v5l4 2'
+
+  menu:
+  'M3 6h18M3 12h18M3 18h18',
+
+  gear:
+  'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+
+  cpu:
+  'M6 6h12v12H6zM9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4',
+
+  mic:
+  'M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8',
+
+  play:
+  'M6 4l14 8-14 8z',
+
+  bolt:
+  'M13 2L3 14h9l-1 8 10-12h-9z',
+
+  yt:
+  'M3 6h18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM10 9l5 3-5 3z',
+
+  store:
+  'M5 3l14 9-14 9zM5 3l8.5 9L5 21',
+
+  cam:
+  'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 9a4 4 0 1 0 0 8 4 4 0 0 0-8 0z',
+
+  home:
+  'M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
+
+  stats:
+  'M18 20V10M12 20V4M6 20v-6',
+
+  hist:
+  'M3 3v5h5M3.05 13A9 9 0 1 0 6 5.3L3 8M12 7v5l4 2',
+
+  target:
+  'M12 12m-8 0a8 8 0 1 0 16 0a8 8 0 1 0-16 0M12 2v4M12 18v4M2 12h4M18 12h4'
 };
 
-function icon(name){ return '<svg viewBox="0 0 24 24"><path d="' + ICONS[name] + '"/></svg>'; }
-function fillIcons(){ document.querySelectorAll('[data-i]').forEach(el => { el.innerHTML = icon(el.dataset.i); }); }
+
+function icon(n){
+
+  return `
+    <svg viewBox="0 0 24 24">
+      <path d="${ICONS[n]}"></path>
+    </svg>
+  `;
+
+}
+
+
+function fillIcons(){
+
+  document
+    .querySelectorAll('[data-i]')
+    .forEach(el => {
+
+      el.innerHTML =
+        icon(el.dataset.i);
+
+    });
+
+}
+
+
+/* ==================================================
+   TOAST
+================================================== */
 
 function toast(msg){
+
   const t = $('toast');
+
   t.textContent = msg;
+
   t.classList.add('show');
+
   clearTimeout(window._tt);
-  window._tt = setTimeout(() => t.classList.remove('show'), 2000);
+
+  window._tt =
+    setTimeout(
+      () => t.classList.remove('show'),
+      2000
+    );
+
 }
 
-function bars(id, count, cls, min, max){
-  const el = $(id);
-  el.innerHTML = '';
-  for (let i = 0; i < count; i++){
-    const b = document.createElement('i');
-    b.className = cls;
-    b.style.height = (min + Math.random() * (max - min)) + '%';
-    b.style.animationDelay = (-Math.random()).toFixed(2) + 's';
-    el.appendChild(b);
-  }
-}
 
-function buildWave(){
+/* ==================================================
+   WAVEFORM
+================================================== */
+
+function buildWaves(){
+
   const w = $('waves');
+
   w.innerHTML = '';
-  const N = 84, mid = (N - 1) / 2;
-  for (let i = 0; i < N; i++){
-    const t = 1 - Math.abs(i - mid) / mid;
-    const b = document.createElement('i');
-    b.className = 'wb ' + (i < mid ? 'r' : 'b');
-    b.style.height = (8 + (0.2 + 0.8 * t) * Math.random() * 88) + '%';
-    b.style.animationDelay = (-Math.random() * 1.2).toFixed(2) + 's';
+
+  const N = 84;
+
+  const mid = (N - 1) / 2;
+
+  for(let i = 0; i < N; i++){
+
+    const t =
+      1 -
+      Math.abs(i - mid) / mid;
+
+    const b =
+      document.createElement('i');
+
+    b.className =
+      'wb ' +
+      (i < mid ? 'r' : 'b');
+
+    b.style.height =
+      (
+        8 +
+        (0.2 + 0.8 * t) *
+        Math.random() *
+        88
+      ) + '%';
+
+    b.style.animationDelay =
+      (
+        -Math.random() * 1.2
+      ).toFixed(2) + 's';
+
     w.appendChild(b);
+
   }
+
 }
 
-const TASKS = [
-  { t:'Study AI & ML', d:true },
-  { t:'Complete Notes', d:false },
-  { t:'Take Quiz', d:false }
-];
-function renderTasks(){
-  const el = $('tasks');
-  el.innerHTML = '';
-  TASKS.forEach(k => {
-    const row = document.createElement('div');
-    row.className = 'task' + (k.d ? ' done' : '');
-    row.innerHTML = '<span class="ck"></span><span></span>';
-    row.lastChild.textContent = k.t;
-    row.onclick = () => { k.d = !k.d; renderTasks(); };
-    el.appendChild(row);
-  });
+
+/* ==================================================
+   EQUALIZER
+================================================== */
+
+function buildEq(){
+
+  const e = $('eq');
+
+  e.innerHTML = '';
+
+  for(let i = 0; i < 7; i++){
+
+    const b =
+      document.createElement('i');
+
+    b.className = 'eb';
+
+    b.style.height =
+      (
+        30 +
+        Math.random() * 70
+      ) + '%';
+
+    b.style.animationDelay =
+      (
+        -Math.random()
+      ).toFixed(2) + 's';
+
+    e.appendChild(b);
+
+  }
+
 }
-$('addTask').onclick = () => {
-  if (TASKS.length >= 5) return toast('Up to 5 tasks');
-  const t = prompt('New task');
-  if (t && t.trim()){ TASKS.push({ t: t.trim().slice(0, 40), d: false }); renderTasks(); }
-};
+
+
+/* ==================================================
+   MAHI STATES
+================================================== */
 
 const MSG = {
-  idle:['I’m here, ' + USER + '.', 'What would you like to do?'],
-  listening:['I’m listening, ' + USER + '.', 'Go ahead.'],
-  thinking:['Let me think about that.', 'One moment, ' + USER + '.'],
-  speaking:['Here is what I found.', 'Tap the mic to stop me.']
+
+  idle:[
+    'I’m here, ' + USER + '.',
+    'What would you like to do?'
+  ],
+
+  listening:[
+    'I’m listening, ' + USER + '.',
+    'Go ahead.'
+  ],
+
+  thinking:[
+    'Let me think about that.',
+    'One moment, ' + USER + '.'
+  ],
+
+  speaking:[
+    'Here is what I found.',
+    'I’m explaining it to you.'
+  ]
+
 };
-function setState(s){
-  document.body.dataset.state = s;
-  document.querySelectorAll('.mode').forEach(m => m.classList.toggle('on', m.dataset.m === s));
-  $('m1').textContent = MSG[s][0];
-  $('m2').textContent = MSG[s][1];
+
+
+/* ==================================================
+   ROBOT VIDEO CONTROL
+================================================== */
+
+const robotVideo =
+  $('robotVideo');
+
+const robotStatus =
+  $('robotStatus');
+
+
+function updateRobotStatus(state){
+
+  const names = {
+
+    idle:'READY',
+
+    listening:'LISTENING',
+
+    thinking:'THINKING',
+
+    speaking:'SPEAKING'
+
+  };
+
+  robotStatus.textContent =
+    names[state] || 'READY';
+
 }
 
-const SEQ = [['listening', 3000], ['thinking', 2000], ['speaking', 3500], ['idle', 0]];
-let seqId = null;
-function runSeq(i){
-  clearTimeout(seqId);
-  if (i >= SEQ.length) return;
-  setState(SEQ[i][0]);
-  if (SEQ[i][1]) seqId = setTimeout(() => runSeq(i + 1), SEQ[i][1]);
-}
-$('mic').onclick = () => runSeq(0);
 
-let focusLeft = 0, focusId = null;
-function pad(n){ return String(n).padStart(2, '0'); }
-function fmt(s){ s = Math.max(0, s); return pad(Math.floor(s / 60)) + ':' + pad(s % 60); }
-function tickClock(){
-  if (focusId) return;
-  const d = new Date();
-  $('time').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  $('date').textContent = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-}
-function toggleFocus(){
-  if (focusId){
-    clearInterval(focusId);
-    focusId = null;
-    $('focusTxt').textContent = 'Start Focus';
-    tickClock();
+/*
+  Important:
+
+  When MAHI speaks:
+  - video starts
+  - robot gestures
+  - waveform speeds up
+
+  When speaking ends:
+  - video pauses
+  - first frame remains visible
+*/
+
+function controlRobotVideo(state){
+
+  if(!robotVideo){
     return;
   }
-  focusLeft = 25 * 60;
-  $('focusTxt').textContent = 'Stop Focus';
-  $('date').textContent = 'Focus';
-  $('time').textContent = fmt(focusLeft);
-  focusId = setInterval(() => {
-    focusLeft--;
-    $('time').textContent = fmt(focusLeft);
-    if (focusLeft <= 0){
-      clearInterval(focusId);
-      focusId = null;
-      $('focusTxt').textContent = 'Start Focus';
-      toast('Focus session done, ' + USER + '!');
-      tickClock();
-    }
-  }, 1000);
+
+
+  if(state === 'speaking'){
+
+    updateRobotStatus('speaking');
+
+    robotVideo
+      .play()
+      .catch(() => {
+
+        /*
+          Android WebView may block autoplay
+          in some configurations.
+
+          User interaction with the microphone
+          normally allows playback.
+        */
+
+      });
+
+  }
+
+  else if(state === 'listening'){
+
+    updateRobotStatus('listening');
+
+    robotVideo.pause();
+
+  }
+
+  else if(state === 'thinking'){
+
+    updateRobotStatus('thinking');
+
+    robotVideo.pause();
+
+  }
+
+  else{
+
+    updateRobotStatus('idle');
+
+    robotVideo.pause();
+
+  }
+
 }
-$('focusBtn').onclick = toggleFocus;
 
-$('qYt').onclick = () => window.open('https://www.youtube.com', '_blank');
-$('qPs').onclick = () => window.open('https://play.google.com/store', '_blank');
-$('qSs').onclick = () => toast('Screenshot comes in a later step');
 
-document.querySelectorAll('.nav button').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b === btn));
-    if (btn.dataset.nav === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
-    else toast(btn.textContent.trim() + ' comes in a later step');
-  };
-});
+/* ==================================================
+   SET STATE
+================================================== */
 
-// Live phone data will be sent here by the Android app in a later step
-window.setStatus = function (s){
-  $('bat').textContent = s.battery + '%';
-  $('temp').textContent = s.temp + ' C';
+function setState(s){
+
+  document.body.dataset.state =
+    s;
+
+  $('m1').textContent =
+    MSG[s][0];
+
+  $('m2').textContent =
+    MSG[s][1];
+
+  controlRobotVideo(s);
+
+}
+
+
+/* ==================================================
+   DEMO SPEAKING SEQUENCE
+================================================== */
+
+const SEQ = [
+
+  ['listening',3000],
+
+  ['thinking',2000],
+
+  ['speaking',5000],
+
+  ['idle',0]
+
+];
+
+let seqId = null;
+
+
+function runSeq(i){
+
+  clearTimeout(seqId);
+
+  if(i >= SEQ.length){
+    return;
+  }
+
+  setState(
+    SEQ[i][0]
+  );
+
+  if(SEQ[i][1]){
+
+    seqId =
+      setTimeout(
+        () => runSeq(i + 1),
+        SEQ[i][1]
+      );
+
+  }
+
+}
+
+
+/* ==================================================
+   MICROPHONE
+================================================== */
+
+$('mic').onclick = () => {
+
+  runSeq(0);
+
 };
 
+
+/* ==================================================
+   FOCUS MODE
+================================================== */
+
+let focusLeft = 0;
+
+let focusId = null;
+
+
+function pad(n){
+
+  return String(n)
+    .padStart(2,'0');
+
+}
+
+
+function fmt(s){
+
+  s = Math.max(0,s);
+
+  return (
+    pad(Math.floor(s / 60))
+    +
+    ':'
+    +
+    pad(s % 60)
+  );
+
+}
+
+
+function tickClock(){
+
+  if(focusId){
+    return;
+  }
+
+  const d =
+    new Date();
+
+  $('time').textContent =
+    pad(d.getHours()) +
+    ':' +
+    pad(d.getMinutes());
+
+  $('date').textContent =
+    d.toLocaleDateString(
+      'en-US',
+      {
+        weekday:'short',
+        month:'short',
+        day:'numeric'
+      }
+    );
+
+}
+
+
+function toggleFocus(){
+
+  if(focusId){
+
+    clearInterval(
+      focusId
+    );
+
+    focusId = null;
+
+    $('focusTxt').textContent =
+      'Start Focus';
+
+    tickClock();
+
+    return;
+
+  }
+
+
+  focusLeft =
+    25 * 60;
+
+  $('focusTxt').textContent =
+    'Stop Focus';
+
+  $('date').textContent =
+    'Focus';
+
+  $('time').textContent =
+    fmt(focusLeft);
+
+
+  focusId =
+    setInterval(() => {
+
+      focusLeft--;
+
+      $('time').textContent =
+        fmt(focusLeft);
+
+      if(focusLeft <= 0){
+
+        clearInterval(
+          focusId
+        );
+
+        focusId = null;
+
+        $('focusTxt').textContent =
+          'Start Focus';
+
+        toast(
+          'Focus session done, ' +
+          USER +
+          '!'
+        );
+
+        tickClock();
+
+      }
+
+    },1000);
+
+}
+
+
+$('focusBtn').onclick =
+  toggleFocus;
+
+
+/* ==================================================
+   QUICK ACTIONS
+================================================== */
+
+$('qYt').onclick =
+  () =>
+    window.open(
+      'https://www.youtube.com',
+      '_blank'
+    );
+
+
+$('qPs').onclick =
+  () =>
+    window.open(
+      'https://play.google.com/store',
+      '_blank'
+    );
+
+
+$('qSs').onclick =
+  () =>
+    toast(
+      'Screenshot comes in a later step'
+    );
+
+
+/* ==================================================
+   NAVIGATION
+================================================== */
+
+document
+.querySelectorAll('.nav button')
+.forEach(btn => {
+
+  btn.onclick = () => {
+
+    document
+      .querySelectorAll('.nav button')
+      .forEach(b => {
+
+        b.classList.toggle(
+          'on',
+          b === btn
+        );
+
+      });
+
+
+    if(
+      btn.dataset.nav === 'home'
+    ){
+
+      window.scrollTo({
+        top:0,
+        behavior:'smooth'
+      });
+
+    }
+
+    else{
+
+      toast(
+        btn.textContent.trim() +
+        ' comes in a later step'
+      );
+
+    }
+
+  };
+
+});
+
+
+/* ==================================================
+   ANDROID BRIDGE READY
+================================================== */
+
+/*
+  Later, your Android/Kotlin code can call:
+
+  window.setState("speaking")
+
+  or:
+
+  window.mahiSpeak("Hello Mahesh")
+
+*/
+
+
+window.setState =
+function(state){
+
+  if(MSG[state]){
+
+    setState(state);
+
+  }
+
+};
+
+
+/*
+  Android can call this when
+  MAHI starts speaking.
+*/
+
+window.mahiSpeak =
+function(text){
+
+  setState('speaking');
+
+  const words =
+    String(text)
+      .split(/\s+/)
+      .length;
+
+  const duration =
+    Math.max(
+      2500,
+      Math.min(
+        15000,
+        words * 280
+      )
+    );
+
+  clearTimeout(
+    window._speechTimer
+  );
+
+  window._speechTimer =
+    setTimeout(
+      () => setState('idle'),
+      duration
+    );
+
+};
+
+
+/*
+  Android can call this when
+  MAHI finishes speaking.
+*/
+
+window.mahiSpeechFinished =
+function(){
+
+  setState('idle');
+
+};
+
+
+/* ==================================================
+   INITIALIZE
+================================================== */
+
 fillIcons();
-renderTasks();
-buildWave();
-bars('spark', 40, 'sp', 15, 100);
-bars('eq', 7, 'eb', 30, 100);
+
+buildWaves();
+
+buildEq();
+
 setState('idle');
+
 tickClock();
-setInterval(tickClock, 1000);
+
+setInterval(
+  tickClock,
+  1000
+);
+
 </script>
+
 </body>
 </html>
