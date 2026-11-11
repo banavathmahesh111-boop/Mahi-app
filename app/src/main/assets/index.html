@@ -830,6 +830,224 @@ body[data-state="speaking"] .eb{
     font-size:9px;
   }
 }
+  /* =========================
+   MAHI ROBOT VIDEO SYSTEM
+========================= */
+
+.center{
+  position:relative;
+  height:330px;
+  min-height:330px;
+  margin:0;
+  overflow:hidden;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+}
+
+/* normal robot */
+.hero{
+  position:absolute;
+  top:0;
+  left:50%;
+  width:240px;
+  height:auto;
+  margin-left:-120px;
+  z-index:2;
+
+  filter:
+    drop-shadow(0 0 12px rgba(40,170,255,.7))
+    drop-shadow(0 0 28px rgba(40,170,255,.35));
+
+  -webkit-mask-image:
+    radial-gradient(
+      closest-side,
+      #000 62%,
+      transparent 100%
+    );
+
+  mask-image:
+    radial-gradient(
+      closest-side,
+      #000 62%,
+      transparent 100%
+    );
+
+  transition:
+    opacity .35s ease,
+    transform .35s ease;
+}
+
+/* speaking video */
+.mahi-video{
+  position:absolute;
+  top:0;
+  left:50%;
+  width:240px;
+  height:300px;
+
+  transform:translateX(-50%);
+
+  object-fit:contain;
+
+  z-index:3;
+
+  opacity:0;
+  visibility:hidden;
+
+  border:0;
+  outline:0;
+
+  background:transparent;
+
+  filter:
+    drop-shadow(0 0 14px rgba(40,170,255,.8))
+    drop-shadow(0 0 30px rgba(40,170,255,.4));
+
+  transition:
+    opacity .35s ease,
+    visibility .35s ease;
+}
+
+/* video becomes visible */
+.center.video-active .mahi-video{
+  opacity:1;
+  visibility:visible;
+}
+
+/* hide robot while video plays */
+.center.video-active .hero{
+  opacity:0;
+}
+
+/* state badge */
+.state-badge{
+  position:absolute;
+  right:8px;
+  top:10px;
+
+  padding:6px 12px;
+
+  border:1px solid var(--blue);
+  border-radius:20px;
+
+  color:#7edcff;
+
+  font-size:10px;
+  font-weight:700;
+
+  letter-spacing:1px;
+
+  background:rgba(0,8,18,.65);
+
+  box-shadow:
+    0 0 10px rgba(47,180,255,.45);
+
+  z-index:6;
+}
+
+/* demo play button */
+.video-btn{
+  position:absolute;
+
+  left:50%;
+  bottom:12px;
+
+  transform:translateX(-50%);
+
+  width:44px;
+  height:44px;
+
+  border:1.5px solid var(--blue);
+  border-radius:50%;
+
+  background:rgba(2,10,20,.75);
+
+  color:#fff;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  z-index:7;
+
+  box-shadow:
+    0 0 15px rgba(47,180,255,.55);
+
+  cursor:pointer;
+}
+
+.video-btn svg{
+  width:20px;
+  height:20px;
+}
+
+/* hide play button while video is active */
+.center.video-active .video-btn{
+  opacity:0;
+  pointer-events:none;
+}
+
+/* speaking animation */
+body[data-state="speaking"] .hero{
+  animation:robotSpeak .45s ease-in-out infinite alternate;
+}
+
+body[data-state="listening"] .hero{
+  animation:robotListen 2s ease-in-out infinite;
+}
+
+body[data-state="thinking"] .hero{
+  animation:robotThink 1s ease-in-out infinite alternate;
+}
+
+@keyframes robotSpeak{
+  from{
+    transform:translateY(0) scale(1);
+  }
+  to{
+    transform:translateY(-5px) scale(1.015);
+  }
+}
+
+@keyframes robotListen{
+  0%,100%{
+    transform:translateX(-4px);
+  }
+  50%{
+    transform:translateX(4px);
+  }
+}
+
+@keyframes robotThink{
+  from{
+    transform:translateY(0);
+  }
+  to{
+    transform:translateY(-7px);
+  }
+}
+
+/* smaller phones */
+@media(max-width:390px){
+  .center{
+    height:300px;
+    min-height:300px;
+  }
+
+  .hero,
+  .mahi-video{
+    width:215px;
+  }
+
+  .hero{
+    margin-left:-107.5px;
+  }
+
+  .mahi-video{
+    height:270px;
+  }
+}
 </style>
 </head>
 
