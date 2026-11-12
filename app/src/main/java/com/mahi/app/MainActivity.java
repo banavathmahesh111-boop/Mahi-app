@@ -1,3 +1,4 @@
+
 package com.mahi.app;
 
 import android.Manifest;
@@ -38,9 +39,20 @@ public class MainActivity extends Activity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private boolean listening = false;
+    private boolean autoListen = false;
+    private boolean inForeground = false;
     private String lastReply = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private static final int MIC_REQUEST = 101;
+
+    // Starts listening again by itself (only while Mahi is on screen)
+    private final Runnable restartTask = new Runnable() {
+        public void run() {
+            if (autoListen && inForeground && !listening) {
+                startMic(true);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,8 +100,16 @@ public class MainActivity extends Activity {
                 if (!listening) {
                     showText("idle", lastReply);
                 }
+                scheduleRestart(500);
             }
         });
+    }
+
+    private void scheduleRestart(long ms) {
+        handler.removeCallbacks(restartTask);
+        if (autoListen) {
+            handler.postDelayed(restartTask, ms);
+        }
     }
 
     // Lets the page talk to the app
@@ -109,16 +129,18 @@ public class MainActivity extends Activity {
     }
 
     private void toggleMic() {
-        if (listening) {
+        if (autoListen) {
+            autoListen = false;
             stopMic();
             return;
         }
+        autoListen = true;
         if (Build.VERSION.SDK_INT >= 23
                 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST);
             return;
         }
-        startMic();
+        startMic(false);
     }
 
     @Override
@@ -126,15 +148,20 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(code, perms, results);
         if (code == MIC_REQUEST) {
             if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-                startMic();
+                startMic(false);
             } else {
+                autoListen = false;
                 showText("idle", "Mic permission needed");
             }
         }
     }
 
-    private void startMic() {
+    private void startMic(boolean keepText) {
+        if (listening) {
+            return;
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            autoListen = false;
             showText("idle", "Speech service not found on this phone");
             return;
         }
@@ -149,22 +176,37 @@ public class MainActivity extends Activity {
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         listening = true;
-        showText("listening", "Listening\u2026");
+        if (keepText) {
+            showState("listening", "LISTENING");
+        } else {
+            showText("listening", "Listening\u2026");
+        }
         recognizer.startListening(intent);
     }
 
     private void stopMic() {
+        handler.removeCallbacks(restartTask);
         listening = false;
+        lastReply = "Mic is off. Tap to start.";
+        if (tts != null) {
+            tts.stop();
+        }
         if (recognizer != null) {
             recognizer.cancel();
         }
-        showText("idle", "Waiting for you\u2026");
+        showText("idle", lastReply);
     }
 
     private void showText(String state, String text) {
         String js = "setState('" + state + "');"
                 + "document.getElementById('sm').textContent=" + JSONObject.quote(text) + ";";
         webView.evaluateJavascript(js, null);
+    }
+
+    // Changes only the status label and colour, and keeps the text on screen
+    private void showState(String state, String label) {
+        webView.evaluateJavascript("document.body.dataset.state='" + state + "';"
+                + "document.getElementById('sl').textContent='" + label + "';", null);
     }
 
     private String first(Bundle b) {
@@ -177,7 +219,11 @@ public class MainActivity extends Activity {
     private void handle(String said) {
         String t = said.toLowerCase(Locale.ROOT).trim();
         String w = t.split(" ")[0];
-        if (t.startsWith("stop") || t.startsWith("pause") || t.contains("stop the song")
+        if (t.contains("stop listening") || t.contains("go to sleep") || t.contains("mic off")
+                || t.equals("sleep")) {
+            autoListen = false;
+            reply("Okay, I'll sleep. Tap the mic to wake me.", null, 0);
+        } else if (t.startsWith("stop") || t.startsWith("pause") || t.contains("stop the song")
                 || t.contains("stop music") || t.contains("stop playing")) {
             reply("Stopped.", media(KeyEvent.KEYCODE_MEDIA_PAUSE), 300);
         } else if (t.equals("play") || t.equals("play music") || t.startsWith("resume")
@@ -227,6 +273,7 @@ public class MainActivity extends Activity {
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mahi");
         } else {
             showText("idle", text);
+            scheduleRestart(1500);
         }
         if (action != null) {
             handler.postDelayed(action, delayMs);
@@ -329,7 +376,7 @@ public class MainActivity extends Activity {
                 showText("thinking", "You said: " + t);
                 handle(t);
             } else {
-                showText("idle", "Didn't catch that");
+                scheduleRestart(500);
             }
         }
 
@@ -340,31 +387,48 @@ public class MainActivity extends Activity {
                 return;
             }
             String msg;
+            boolean retry = false;
             switch (error) {
                 case SpeechRecognizer.ERROR_NO_MATCH:
                 case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
                     msg = "Didn't catch that. Tap and try again";
+                    retry = true;
+                    break;
+                case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                    msg = "Mic is busy. Tap and try again";
+                    retry = true;
                     break;
                 case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
                     msg = "Mic permission needed";
                     break;
                 case SpeechRecognizer.ERROR_NETWORK:
                 case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
-                    msg = "Voice needs internet";
-                    break;
-                case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
-                    msg = "Mic is busy, try again";
+                    msg = "Voice needs internet. Tap the mic to try again";
                     break;
                 default:
-                    msg = "Mic error " + error;
+                    msg = "Mic error " + error + ". Tap the mic to try again";
             }
+            if (retry && autoListen) {
+                scheduleRestart(error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? 1000 : 300);
+                return;
+            }
+            autoListen = false;
             showText("idle", msg);
         }
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        inForeground = true;
+        scheduleRestart(600);
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
+        inForeground = false;
+        handler.removeCallbacks(restartTask);
         listening = false;
         if (recognizer != null) {
             recognizer.cancel();
@@ -382,6 +446,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        handler.removeCallbacksAndMessages(null);
         if (recognizer != null) {
             recognizer.destroy();
         }
