@@ -102,6 +102,14 @@ body{padding-bottom:100px}
 .wb:nth-child(5n+2){height:34%!important}
 .wb:nth-child(7n+4){height:22%!important}
 .eb{background:#ff1f3d;box-shadow:0 0 5px #ff1f3d}
+.hero{width:160px;margin-left:-80px}
+.micwrap{width:170px;height:170px;margin-left:-85px;top:6px}
+.mic{left:20px;top:20px;width:130px;height:130px}
+.mic span{width:50px;height:50px}
+.ring.a{box-shadow:0 0 30px var(--blue),inset 0 0 20px rgba(47,180,255,.5)}
+.states{display:flex;justify-content:space-between;gap:6px;margin:4px 0 12px;padding:6px;border:1.5px solid rgba(255,42,42,.4);border-radius:12px;font-size:11px;color:#8a8a8a}
+.states span{flex:1;text-align:center;padding:6px 2px;border-radius:9px;border:1px solid transparent}
+body[data-state=idle] .st-idle,body[data-state=listening] .st-listening,body[data-state=thinking] .st-thinking,body[data-state=speaking] .st-speaking{color:#fff;border-color:#2fb4ff;box-shadow:0 0 10px rgba(47,180,255,.6)}
 </style>
 </head>
 <body data-state="idle">
@@ -131,6 +139,12 @@ body{padding-bottom:100px}
 </section>
 
 <section class="msg">
+  <div class="states">
+  <span class="st-idle">Ready</span>
+  <span class="st-listening">Listening</span>
+  <span class="st-thinking">Thinking</span>
+  <span class="st-speaking">Speaking</span>
+  </div>
   <div class="av"></div>
   <p><span id="m1"></span><span id="m2"></span></p>
   <div class="eq" id="eq"></div>
