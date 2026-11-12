@@ -331,5 +331,100 @@ setState('idle');
 tickClock();
 setInterval(tickClock, 1000);
 </script>
+  <style>
+.waves canvas{display:block;width:100%;height:100%}
+</style>
+<script>
+(function(){
+  const host = document.getElementById('waves');
+  host.innerHTML = '';
+  const cv = document.createElement('canvas');
+  host.appendChild(cv);
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0;
+
+  function size(){
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  size();
+  window.addEventListener('resize', size);
+
+  const LAYERS = [
+    { a: 1.00, f: 2.2, s: 1.0,  ph: 0.0, w: 2.4, alpha: 1.0 },
+    { a: 0.62, f: 3.1, s: -1.3, ph: 1.2, w: 1.5, alpha: 0.7 },
+    { a: 0.34, f: 4.6, s: 1.8,  ph: 2.4, w: 1.0, alpha: 0.5 }
+  ];
+
+  function speed(){
+    const s = document.body.dataset.state;
+    return s === 'speaking' ? 2.6 : s === 'thinking' ? 1.6 : s === 'listening' ? 1.1 : 0.6;
+  }
+  function amp(){
+    const s = document.body.dataset.state;
+    return s === 'speaking' ? 1.0 : s === 'thinking' ? 0.8 : s === 'listening' ? 0.6 : 0.35;
+  }
+  function env(nx){ return 0.3 + 0.7 * Math.pow(Math.sin(Math.PI * nx), 0.9); }
+
+  function yAt(L, nx, t, mid){
+    const e = env(nx) * amp() * H * 0.36 * L.a;
+    const carrier = Math.sin(nx * Math.PI * 2 * L.f + t * L.s + L.ph);
+    const mod = 0.55 + 0.45 * Math.sin(nx * Math.PI * 9 + t * 1.7 + L.ph);
+    return mid + e * carrier * mod;
+  }
+
+  let t = 0, last = performance.now();
+  function frame(now){
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    t += dt * speed();
+    ctx.clearRect(0, 0, W, H);
+    const mid = H / 2;
+
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0,    'rgba(255,42,58,0)');
+    g.addColorStop(0.08, 'rgba(255,42,58,1)');
+    g.addColorStop(0.42, 'rgba(255,47,208,1)');
+    g.addColorStop(0.58, 'rgba(47,208,255,1)');
+    g.addColorStop(0.92, 'rgba(47,180,255,1)');
+    g.addColorStop(1,    'rgba(47,180,255,0)');
+
+    LAYERS.forEach(L => {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 3){
+        const nx = x / W;
+        const y = yAt(L, nx, t, mid);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = g;
+      ctx.globalAlpha = 0.18 * L.alpha;
+      ctx.lineWidth = L.w * 5;
+      ctx.stroke();
+      ctx.globalAlpha = L.alpha;
+      ctx.lineWidth = L.w;
+      ctx.stroke();
+    });
+
+    ctx.globalAlpha = 1;
+    for (let k = 0; k < 120; k++){
+      const nx = (k * 0.61803) % 1;
+      const y = yAt(LAYERS[0], nx, t, mid) + Math.sin(t * 2 + k) * 6;
+      const left = nx < 0.5;
+      ctx.fillStyle = left ? 'rgba(255,42,58,' : 'rgba(47,180,255,';
+      ctx.globalAlpha = 0.35 + 0.35 * Math.sin(t * 3 + k);
+      ctx.beginPath();
+      ctx.arc(nx * W, y, 0.6 + (k % 3) * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>
