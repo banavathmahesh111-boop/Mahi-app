@@ -1,4 +1,3 @@
-
 package com.mahi.app;
 
 import android.Manifest;
@@ -28,12 +27,25 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import org.json.JSONObject;
+import org.vosk.Model;
+import org.vosk.Recognizer;
+import org.vosk.android.SpeechService;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -48,6 +60,15 @@ public class MainActivity extends Activity {
     private String lastReply = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private static final int MIC_REQUEST = 101;
+    private static final int WAKE_REQUEST = 102;
+
+    // Offline voice model (used by the wake word test)
+    private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip";
+    private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
+    private Model voskModel;
+    private SpeechService voskService;
+    private boolean wakeTest = false;
+    private boolean downloading = false;
 
     // Starts listening again by itself (only while Mahi is on screen and no music is playing)
     private final Runnable restartTask = new Runnable() {
@@ -102,7 +123,7 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() {
             public void run() {
                 speaking = false;
-                if (listening) {
+                if (listening || wakeTest) {
                     return;
                 }
                 showText("idle", lastReply);
@@ -149,12 +170,22 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void onAction(String name) {
+        public void onAction(final String name) {
+            if ("settings".equals(name)) {
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        toggleWakeTest();
+                    }
+                });
+            }
         }
     }
 
     private void toggleMic() {
-        if (listening) {
+        if (wakeTest) {
+            stopWakeTest();
+        }
+        if (autoListen) {
             autoListen = false;
             stopMic();
             return;
@@ -171,11 +202,18 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         if (code == MIC_REQUEST) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            if (granted) {
                 startMic(false);
             } else {
                 autoListen = false;
+                showText("idle", "Mic permission needed");
+            }
+        } else if (code == WAKE_REQUEST) {
+            if (granted) {
+                toggleWakeTest();
+            } else {
                 showText("idle", "Mic permission needed");
             }
         }
@@ -236,6 +274,14 @@ public class MainActivity extends Activity {
         webView.evaluateJavascript(js, null);
     }
 
+    private void postText(final String state, final String text) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                showText(state, text);
+            }
+        });
+    }
+
     // Changes only the status label and colour, and keeps the text on screen
     private void showState(String state, String label) {
         webView.evaluateJavascript("document.body.dataset.state='" + state + "';"
@@ -245,6 +291,237 @@ public class MainActivity extends Activity {
     private String first(Bundle b) {
         ArrayList<String> list = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
         return (list != null && !list.isEmpty()) ? list.get(0) : null;
+    }
+
+    // ---------- Wake word test (offline, tap the gear icon) ----------
+
+    private void toggleWakeTest() {
+        if (wakeTest) {
+            stopWakeTest();
+            return;
+        }
+        if (downloading) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 23
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, WAKE_REQUEST);
+            return;
+        }
+        autoListen = false;
+        if (listening) {
+            stopMic();
+        }
+        wakeTest = true;
+        startWakeTest();
+    }
+
+    private void startWakeTest() {
+        final File dir = new File(getFilesDir(), VOSK_DIR);
+        if (!new File(dir, "am").isDirectory()) {
+            downloadModel();
+            return;
+        }
+        postText("thinking", "Loading voice model\u2026");
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    if (voskModel == null) {
+                        voskModel = new Model(dir.getAbsolutePath());
+                    }
+                    Recognizer rec = new Recognizer(voskModel, 16000.0f);
+                    final SpeechService svc = new SpeechService(rec, 16000.0f);
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (!wakeTest) {
+                                svc.shutdown();
+                                return;
+                            }
+                            voskService = svc;
+                            svc.startListening(new VoskListener());
+                            showText("listening", "Say: Hey Mahi");
+                        }
+                    });
+                } catch (Exception e) {
+                    wakeTest = false;
+                    postText("idle", "Voice test error: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    private void stopWakeTest() {
+        wakeTest = false;
+        if (voskService != null) {
+            voskService.stop();
+            voskService.shutdown();
+            voskService = null;
+        }
+        showText("idle", "Voice test stopped");
+    }
+
+    private class VoskListener implements org.vosk.android.RecognitionListener {
+        public void onPartialResult(String h) {
+            heard(h, "partial");
+        }
+
+        public void onResult(String h) {
+            heard(h, "text");
+        }
+
+        public void onFinalResult(String h) {
+            heard(h, "text");
+        }
+
+        public void onError(Exception e) {
+            postText("idle", "Voice test error: " + e.getMessage());
+        }
+
+        public void onTimeout() {
+        }
+    }
+
+    private void heard(final String json, final String key) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                if (!wakeTest) {
+                    return;
+                }
+                String t;
+                try {
+                    t = new JSONObject(json).optString(key, "");
+                } catch (Exception e) {
+                    return;
+                }
+                if (t.length() == 0) {
+                    return;
+                }
+                showText("listening", "Heard: " + t + (looksLikeWake(t) ? "  \u2705" : ""));
+            }
+        });
+    }
+
+    private boolean looksLikeWake(String text) {
+        String[] words = text.toLowerCase(Locale.ROOT).split(" ");
+        String[] names = {"mahi", "mahe", "mahee", "maahi", "mehi", "mohi", "mahey", "mahih"};
+        for (int i = 0; i < words.length; i++) {
+            for (String n : names) {
+                if (words[i].equals(n)) {
+                    return true;
+                }
+            }
+            if (i + 1 < words.length) {
+                String pair = words[i] + " " + words[i + 1];
+                if (pair.equals("ma he") || pair.equals("my he") || pair.equals("may he")
+                        || pair.equals("ma hi") || pair.equals("mi hi")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void downloadModel() {
+        if (downloading) {
+            return;
+        }
+        downloading = true;
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    File zip = new File(getCacheDir(), "model.zip");
+                    HttpURLConnection c = (HttpURLConnection) new URL(VOSK_URL).openConnection();
+                    c.setConnectTimeout(15000);
+                    c.setReadTimeout(30000);
+                    int total = c.getContentLength();
+                    InputStream in = c.getInputStream();
+                    FileOutputStream out = new FileOutputStream(zip);
+                    byte[] buf = new byte[65536];
+                    long got = 0;
+                    int n;
+                    int lastPct = -1;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        got += n;
+                        int pct = total > 0 ? (int) (got * 100 / total) : 0;
+                        if (pct != lastPct) {
+                            lastPct = pct;
+                            postText("thinking", "Downloading voice model " + pct + "%");
+                        }
+                    }
+                    out.close();
+                    in.close();
+                    postText("thinking", "Unpacking\u2026");
+                    File tmp = new File(getFilesDir(), "vosk_tmp");
+                    deleteDir(tmp);
+                    unzip(zip, tmp);
+                    File made = new File(tmp, VOSK_DIR);
+                    File dest = new File(getFilesDir(), VOSK_DIR);
+                    deleteDir(dest);
+                    if (!made.renameTo(dest)) {
+                        throw new IOException("Could not save the model");
+                    }
+                    deleteDir(tmp);
+                    zip.delete();
+                    downloading = false;
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (wakeTest) {
+                                startWakeTest();
+                            }
+                        }
+                    });
+                } catch (Exception e) {
+                    downloading = false;
+                    wakeTest = false;
+                    postText("idle", "Download failed: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    private void unzip(File zip, File outDir) throws IOException {
+        outDir.mkdirs();
+        String base = outDir.getCanonicalPath() + File.separator;
+        ZipInputStream zin = new ZipInputStream(new BufferedInputStream(new FileInputStream(zip)));
+        try {
+            ZipEntry e;
+            byte[] buf = new byte[65536];
+            while ((e = zin.getNextEntry()) != null) {
+                File f = new File(outDir, e.getName());
+                if (!f.getCanonicalPath().startsWith(base)) {
+                    throw new IOException("Bad zip file");
+                }
+                if (e.isDirectory()) {
+                    f.mkdirs();
+                    continue;
+                }
+                f.getParentFile().mkdirs();
+                FileOutputStream o = new FileOutputStream(f);
+                int n;
+                while ((n = zin.read(buf)) > 0) {
+                    o.write(buf, 0, n);
+                }
+                o.close();
+            }
+        } finally {
+            zin.close();
+        }
+    }
+
+    private void deleteDir(File f) {
+        if (f == null || !f.exists()) {
+            return;
+        }
+        if (f.isDirectory()) {
+            File[] kids = f.listFiles();
+            if (kids != null) {
+                for (File k : kids) {
+                    deleteDir(k);
+                }
+            }
+        }
+        f.delete();
     }
 
     // ---------- Mahi's brain (simple commands) ----------
@@ -550,6 +827,9 @@ public class MainActivity extends Activity {
         if (recognizer != null) {
             recognizer.cancel();
         }
+        if (wakeTest) {
+            stopWakeTest();
+        }
     }
 
     @Override
@@ -564,6 +844,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        if (voskService != null) {
+            voskService.shutdown();
+        }
         if (recognizer != null) {
             recognizer.destroy();
         }
