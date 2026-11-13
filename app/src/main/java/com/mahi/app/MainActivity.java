@@ -65,9 +65,10 @@ public class MainActivity extends Activity {
     // Offline voice model (used by the wake word test)
     private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip";
     private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
-    // The model only listens for these sound-alike phrases, and treats everything else as unknown
-    private static final String WAKE_GRAMMAR = "[\"hey my he\", \"hey ma he\", \"hey may he\", \"hey me he\", "
-            + "\"my he\", \"ma he\", \"may he\", \"me he\", \"[unk]\"]";
+    // The wake phrase. Change this one line (lowercase, real English words) to change it.
+    private static final String WAKE_PHRASE = "hey buddy";
+    // The model only listens for the wake phrase, and treats everything else as unknown
+    private static final String WAKE_GRAMMAR = "[\"" + WAKE_PHRASE + "\", \"[unk]\"]";
     private Model voskModel;
     private SpeechService voskService;
     private boolean wakeTest = false;
@@ -344,7 +345,7 @@ public class MainActivity extends Activity {
                             }
                             voskService = svc;
                             svc.startListening(new VoskListener());
-                            showText("listening", "Say: Hey Mahi");
+                            showText("listening", "Say: " + WAKE_PHRASE);
                         }
                     });
                 } catch (Exception e) {
@@ -413,7 +414,7 @@ public class MainActivity extends Activity {
 
     private boolean looksLikeWake(String text) {
         String t = text.toLowerCase(Locale.ROOT).replace("[unk]", "").trim();
-        return t.contains("my he") || t.contains("ma he") || t.contains("may he") || t.contains("me he");
+        return t.contains(WAKE_PHRASE);
     }
 
     private void downloadModel() {
