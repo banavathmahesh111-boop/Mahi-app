@@ -27,5 +27,6 @@ android {
 }
 
 dependencies {
-    implementation 'ai.picovoice:porcupine-android:3.0.3'
+    implementation 'net.java.dev.jna:jna:5.13.0@aar'
+    implementation 'com.alphacephei:vosk-android:0.3.47'
 }
