@@ -65,10 +65,14 @@ public class MainActivity extends Activity {
     // Offline voice model (used by the wake word test)
     private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip";
     private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
+    // The model only listens for these sound-alike phrases, and treats everything else as unknown
+    private static final String WAKE_GRAMMAR = "[\"hey my he\", \"hey ma he\", \"hey may he\", \"hey me he\", "
+            + "\"my he\", \"ma he\", \"may he\", \"me he\", \"[unk]\"]";
     private Model voskModel;
     private SpeechService voskService;
     private boolean wakeTest = false;
     private boolean downloading = false;
+    private int wakeHits = 0;
 
     // Starts listening again by itself (only while Mahi is on screen and no music is playing)
     private final Runnable restartTask = new Runnable() {
@@ -313,6 +317,7 @@ public class MainActivity extends Activity {
             stopMic();
         }
         wakeTest = true;
+        wakeHits = 0;
         startWakeTest();
     }
 
@@ -329,7 +334,7 @@ public class MainActivity extends Activity {
                     if (voskModel == null) {
                         voskModel = new Model(dir.getAbsolutePath());
                     }
-                    Recognizer rec = new Recognizer(voskModel, 16000.0f);
+                    Recognizer rec = new Recognizer(voskModel, 16000.0f, WAKE_GRAMMAR);
                     final SpeechService svc = new SpeechService(rec, 16000.0f);
                     runOnUiThread(new Runnable() {
                         public void run() {
@@ -357,7 +362,7 @@ public class MainActivity extends Activity {
             voskService.shutdown();
             voskService = null;
         }
-        showText("idle", "Voice test stopped");
+        showText("idle", "Voice test stopped. Matches: " + wakeHits);
     }
 
     private class VoskListener implements org.vosk.android.RecognitionListener {
@@ -396,29 +401,19 @@ public class MainActivity extends Activity {
                 if (t.length() == 0) {
                     return;
                 }
-                showText("listening", "Heard: " + t + (looksLikeWake(t) ? "  \u2705" : ""));
+                boolean wake = looksLikeWake(t);
+                if (wake && "text".equals(key)) {
+                    wakeHits++;
+                }
+                String shown = t.replace("[unk]", "(other)");
+                showText("listening", "Heard: " + shown + (wake ? "  \u2705 " + wakeHits : ""));
             }
         });
     }
 
     private boolean looksLikeWake(String text) {
-        String[] words = text.toLowerCase(Locale.ROOT).split(" ");
-        String[] names = {"mahi", "mahe", "mahee", "maahi", "mehi", "mohi", "mahey", "mahih"};
-        for (int i = 0; i < words.length; i++) {
-            for (String n : names) {
-                if (words[i].equals(n)) {
-                    return true;
-                }
-            }
-            if (i + 1 < words.length) {
-                String pair = words[i] + " " + words[i + 1];
-                if (pair.equals("ma he") || pair.equals("my he") || pair.equals("may he")
-                        || pair.equals("ma hi") || pair.equals("mi hi")) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        String t = text.toLowerCase(Locale.ROOT).replace("[unk]", "").trim();
+        return t.contains("my he") || t.contains("ma he") || t.contains("may he") || t.contains("me he");
     }
 
     private void downloadModel() {
