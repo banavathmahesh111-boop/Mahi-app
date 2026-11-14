@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -69,9 +70,10 @@ public class MahiService extends Service {
     static final String ACTION_TALK = "com.mahi.app.TALK";
     static final String ACTION_STOP = "com.mahi.app.STOP";
 
-    // The wake phrase. Change this one line (lowercase, real English words) to change it.
+    // The wake phrase and the sound-alikes the offline listener accepts
     private static final String WAKE_PHRASE = "hey buddy";
-    private static final String WAKE_GRAMMAR = "[\"" + WAKE_PHRASE + "\", \"[unk]\"]";
+    private static final String[] WAKE_WORDS = {"hey buddy", "hey body", "hey bud", "a buddy", "hey buddies"};
+    private static final String WAKE_GRAMMAR = grammar();
     private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip";
     private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
     private static final String CHANNEL = "mahi_listening";
@@ -123,6 +125,7 @@ public class MahiService extends Service {
     private SpeechService voskSvc;
     private SpeechRecognizer recognizer;
     private TextToSpeech tts;
+    private PowerManager.WakeLock wakeLock;
     private boolean ttsReady = false;
     private boolean speaking = false;
     private boolean commandOn = false;
@@ -138,6 +141,24 @@ public class MahiService extends Service {
         }
     };
 
+    // Every 5 seconds: if the wake listener has stopped by itself, start it again
+    private final Runnable watchdog = new Runnable() {
+        public void run() {
+            if (running && !commandOn && !speaking && !loading && !downloading && voskSvc == null) {
+                startWake();
+            }
+            handler.postDelayed(this, 5000);
+        }
+    };
+
+    private static String grammar() {
+        StringBuilder sb = new StringBuilder("[");
+        for (String w : WAKE_WORDS) {
+            sb.append("\"").append(w).append("\", ");
+        }
+        return sb.append("\"[unk]\"]").toString();
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -150,6 +171,9 @@ public class MahiService extends Service {
         NotificationChannel ch = new NotificationChannel(CHANNEL, "Mahi listening",
                 NotificationManager.IMPORTANCE_LOW);
         getSystemService(NotificationManager.class).createNotificationChannel(ch);
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "mahi:listen");
+        wakeLock.setReferenceCounted(false);
         initTts();
     }
 
@@ -180,6 +204,16 @@ public class MahiService extends Service {
             return START_NOT_STICKY;
         }
         running = true;
+        // Keeps the phone's processor awake so the wake word is heard with the screen off
+        try {
+            if (wakeLock != null && !wakeLock.isHeld()) {
+                wakeLock.acquire();
+            }
+        } catch (Exception e) {
+            // permission missing: Mahi still works, just less reliably in the background
+        }
+        handler.removeCallbacks(watchdog);
+        handler.postDelayed(watchdog, 5000);
         if (ACTION_TALK.equals(action)) {
             talkNow();
         } else {
@@ -302,7 +336,7 @@ public class MahiService extends Service {
     }
 
     private void startWake() {
-        if (!running || voskSvc != null || loading || commandOn || speaking) {
+        if (!running || voskSvc != null || loading || commandOn || speaking || downloading) {
             return;
         }
         final File dir = new File(getFilesDir(), VOSK_DIR);
@@ -353,8 +387,12 @@ public class MahiService extends Service {
     private void stopVosk() {
         handler.removeCallbacks(wakeTask);
         if (voskSvc != null) {
-            voskSvc.stop();
-            voskSvc.shutdown();
+            try {
+                voskSvc.stop();
+                voskSvc.shutdown();
+            } catch (Exception e) {
+                // already stopped
+            }
             voskSvc = null;
         }
     }
@@ -372,21 +410,35 @@ public class MahiService extends Service {
             check(h, "text");
         }
 
+        // The listener stopped with an error: start it again after a moment
         public void onError(Exception e) {
-            push("idle", "Voice error: " + e.getMessage());
+            handler.post(new Runnable() {
+                public void run() {
+                    stopVosk();
+                    scheduleWake(1000);
+                }
+            });
         }
 
+        // The listener timed out: start it again straight away
         public void onTimeout() {
+            handler.post(new Runnable() {
+                public void run() {
+                    stopVosk();
+                    scheduleWake(300);
+                }
+            });
         }
     }
 
     private void check(String json, String key) {
-        if (commandOn || voskSvc == null) {
+        if (commandOn) {
             return;
         }
         try {
-            String t = new JSONObject(json).optString(key, "").replace("[unk]", "").trim();
-            if (t.contains(WAKE_PHRASE)) {
+            String t = new JSONObject(json).optString(key, "").toLowerCase(Locale.ROOT)
+                    .replace("[unk]", "").trim();
+            if (isWake(t)) {
                 handler.post(new Runnable() {
                     public void run() {
                         onWake();
@@ -394,8 +446,17 @@ public class MahiService extends Service {
                 });
             }
         } catch (Exception e) {
-            // ignore
+            // ignore bad output
         }
+    }
+
+    private boolean isWake(String t) {
+        for (String w : WAKE_WORDS) {
+            if (t.contains(w)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void onWake() {
@@ -544,7 +605,7 @@ public class MahiService extends Service {
         int best = -1;
         for (String v : verbs) {
             int i = t.indexOf(v);
-            while (i >= 0 && i > 0 && t.charAt(i - 1) != ' ') {
+            while (i > 0 && t.charAt(i - 1) != ' ') {
                 i = t.indexOf(v, i + 1);
             }
             if (i >= 0 && (best < 0 || i < best)) {
@@ -749,16 +810,13 @@ public class MahiService extends Service {
         };
     }
 
-    // Plays the song: first through YouTube Music / Spotify, otherwise the first YouTube result
+    // Plays the song in the YouTube app (it starts by itself). Spotify is used only if you say "spotify".
     private Runnable playSong(final String song, final boolean spotifyFirst) {
         return new Runnable() {
             public void run() {
-                String[] apps = spotifyFirst
-                        ? new String[]{"com.spotify.music", "com.google.android.apps.youtube.music"}
-                        : new String[]{"com.google.android.apps.youtube.music", "com.spotify.music"};
-                for (String pkg : apps) {
+                if (spotifyFirst) {
                     Intent i = new Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH);
-                    i.setPackage(pkg);
+                    i.setPackage("com.spotify.music");
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     i.putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*");
                     i.putExtra(SearchManager.QUERY, song);
@@ -766,7 +824,7 @@ public class MahiService extends Service {
                         startActivity(i);
                         return;
                     } catch (Exception e) {
-                        // try the next music app
+                        // Spotify is not installed, so use YouTube below
                     }
                 }
                 new Thread(new Runnable() {
@@ -793,8 +851,7 @@ public class MahiService extends Service {
     private String findVideoId(String query) {
         HttpURLConnection c = null;
         try {
-            String u = "https://www.youtube.com/results?search_query=" + Uri.encode(query)
-                    + "&sp=EgIQAQ%253D%253D";
+            String u = "https://www.youtube.com/results?search_query=" + Uri.encode(query);
             c = (HttpURLConnection) new URL(u).openConnection();
             c.setConnectTimeout(8000);
             c.setReadTimeout(8000);
@@ -846,7 +903,9 @@ public class MahiService extends Service {
 
     private void openUrl(String url, String pkg) {
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        i.setPackage(pkg);
+        if (pkg != null) {
+            i.setPackage(pkg);
+        }
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             startActivity(i);
@@ -974,6 +1033,13 @@ public class MahiService extends Service {
         }
         if (tts != null) {
             tts.shutdown();
+        }
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception e) {
+            // ignore
         }
         lastState = "idle";
         lastText = "Mahi is off. Tap the gear to turn on.";
