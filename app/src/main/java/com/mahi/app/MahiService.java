@@ -477,8 +477,26 @@ public class MahiService extends Service {
 
     // ---------- Mahi's brain (simple commands) ----------
 
+    // Drops anything said before the command word, e.g. "ye badi open whatsapp" -> "open whatsapp"
+    private String cutToCommand(String t) {
+        String[] verbs = {"open ", "launch ", "start ", "play ", "install ", "download ", "stop", "pause",
+                "resume", "continue", "next", "skip", "previous", "what time", "what date", "what day",
+                "today's date", "go to sleep", "hello", "sleep", "mic off"};
+        int best = -1;
+        for (String v : verbs) {
+            int i = t.indexOf(v);
+            while (i >= 0 && i > 0 && t.charAt(i - 1) != ' ') {
+                i = t.indexOf(v, i + 1);
+            }
+            if (i >= 0 && (best < 0 || i < best)) {
+                best = i;
+            }
+        }
+        return best > 0 ? t.substring(best).trim() : t;
+    }
+
     private void handle(String said) {
-        String t = said.toLowerCase(Locale.ROOT).trim();
+        String t = cutToCommand(said.toLowerCase(Locale.ROOT).trim());
         String w = t.split(" ")[0];
         if (t.contains("stop listening") || t.contains("go to sleep") || t.contains("mic off")
                 || t.equals("sleep")) {
