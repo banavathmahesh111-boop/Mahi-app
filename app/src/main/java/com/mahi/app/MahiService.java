@@ -42,11 +42,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -61,6 +64,7 @@ public class MahiService extends Service {
     static String lastState = "idle";
     static String lastText = "Mahi is off. Tap the gear to turn on.";
     static boolean running = false;
+    static MahiService inst;
 
     static final String ACTION_TALK = "com.mahi.app.TALK";
     static final String ACTION_STOP = "com.mahi.app.STOP";
@@ -72,6 +76,47 @@ public class MahiService extends Service {
     private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
     private static final String CHANNEL = "mahi_listening";
     private static final int NOTE_ID = 7;
+
+    // Popular apps: spoken name (lowercase, no spaces) -> Play Store package
+    private static final String[][] KNOWN_APPS = {
+            {"whatsapp", "com.whatsapp"},
+            {"instagram", "com.instagram.android"},
+            {"facebook", "com.facebook.katana"},
+            {"messenger", "com.facebook.orca"},
+            {"youtube", "com.google.android.youtube"},
+            {"youtubemusic", "com.google.android.apps.youtube.music"},
+            {"spotify", "com.spotify.music"},
+            {"telegram", "org.telegram.messenger"},
+            {"snapchat", "com.snapchat.android"},
+            {"twitter", "com.twitter.android"},
+            {"x", "com.twitter.android"},
+            {"netflix", "com.netflix.mediaclient"},
+            {"flipkart", "com.flipkart.android"},
+            {"phonepe", "com.phonepe.app"},
+            {"googlepay", "com.google.android.apps.nbu.paisa.user"},
+            {"paytm", "net.one97.paytm"},
+            {"zomato", "com.application.zomato"},
+            {"swiggy", "in.swiggy.android"},
+            {"chrome", "com.android.chrome"},
+            {"gmail", "com.google.android.gm"},
+            {"googlemaps", "com.google.android.apps.maps"},
+            {"maps", "com.google.android.apps.maps"},
+            {"hotstar", "in.startv.hotstar"},
+            {"truecaller", "com.truecaller"},
+            {"linkedin", "com.linkedin.android"},
+            {"discord", "com.discord"},
+            {"reddit", "com.reddit.frontpage"},
+            {"pinterest", "com.pinterest"},
+            {"zoom", "us.zoom.videomeetings"},
+            {"googlemeet", "com.google.android.apps.tachyon"},
+            {"uber", "com.ubercab"},
+            {"ola", "com.olacabs.customer"},
+            {"canva", "com.canva.editor"},
+            {"duolingo", "com.duolingo"},
+            {"vlc", "org.videolan.vlc"},
+            {"chatgpt", "com.openai.chatgpt"},
+            {"gemini", "com.google.android.apps.bard"}
+    };
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Model model;
@@ -101,10 +146,24 @@ public class MahiService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        inst = this;
         NotificationChannel ch = new NotificationChannel(CHANNEL, "Mahi listening",
                 NotificationManager.IMPORTANCE_LOW);
         getSystemService(NotificationManager.class).createNotificationChannel(ch);
         initTts();
+    }
+
+    // Lets other parts of Mahi (like the Install tapper) speak
+    static void say(final String text) {
+        final MahiService s = inst;
+        if (s == null) {
+            return;
+        }
+        s.handler.post(new Runnable() {
+            public void run() {
+                s.reply(text, null, 0);
+            }
+        });
     }
 
     @Override
@@ -521,10 +580,9 @@ public class MahiService extends Service {
             if (blocked()) {
                 return;
             }
-            String app = clean(t.substring(t.indexOf(' ') + 1),
+            String name = clean(t.substring(t.indexOf(' ') + 1),
                     " from play store", " on play store", " in play store", " app");
-            reply("Opening Play Store for " + app + ". Tap Install.",
-                    later("market://search?q=" + Uri.encode(app) + "&c=apps", "com.android.vending"), 1800);
+            installApp(name);
         } else if (t.contains("play store")) {
             if (blocked()) {
                 return;
@@ -576,6 +634,36 @@ public class MahiService extends Service {
         reply("I need the Appear on top permission to open apps from the background. "
                 + "Please allow it for Mahi in Settings.", null, 0);
         return true;
+    }
+
+    // ---------- Installing apps ----------
+
+    private String knownPackage(String spoken) {
+        String n = norm(spoken);
+        for (String[] a : KNOWN_APPS) {
+            if (a[0].equals(n)) {
+                return a[1];
+            }
+        }
+        return null;
+    }
+
+    private void installApp(String name) {
+        String pkg = knownPackage(name);
+        if (pkg != null && getPackageManager().getLaunchIntentForPackage(pkg) != null) {
+            reply(name + " is already installed.", null, 0);
+            return;
+        }
+        String url = pkg != null
+                ? "market://details?id=" + pkg
+                : "market://search?q=" + Uri.encode(name) + "&c=apps";
+        if (MahiAccess.instance == null) {
+            reply("Opening Play Store for " + name + ". To let me tap Install for you, "
+                    + "turn on Mahi in Accessibility settings.", later(url, "com.android.vending"), 2500);
+            return;
+        }
+        MahiAccess.instance.startInstall(name, pkg == null);
+        reply("Okay, installing " + name + ".", later(url, "com.android.vending"), 1500);
     }
 
     // ---------- Opening apps ----------
@@ -661,7 +749,7 @@ public class MahiService extends Service {
         };
     }
 
-    // Asks YouTube Music or Spotify to search for the song and start playing it
+    // Plays the song: first through YouTube Music / Spotify, otherwise the first YouTube result
     private Runnable playSong(final String song, final boolean spotifyFirst) {
         return new Runnable() {
             public void run() {
@@ -681,11 +769,71 @@ public class MahiService extends Service {
                         // try the next music app
                     }
                 }
-                openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(song),
-                        "com.google.android.youtube");
-                push("idle", "No music app found. Tap a song in YouTube.");
+                new Thread(new Runnable() {
+                    public void run() {
+                        final String id = findVideoId(song);
+                        handler.post(new Runnable() {
+                            public void run() {
+                                if (id != null) {
+                                    playVideo(id);
+                                } else {
+                                    openUrl("https://www.youtube.com/results?search_query=" + Uri.encode(song),
+                                            "com.google.android.youtube");
+                                    push("idle", "I couldn't find that song. Tap a result in YouTube.");
+                                }
+                            }
+                        });
+                    }
+                }).start();
             }
         };
+    }
+
+    // Reads YouTube's search page and returns the first video id (or null)
+    private String findVideoId(String query) {
+        HttpURLConnection c = null;
+        try {
+            String u = "https://www.youtube.com/results?search_query=" + Uri.encode(query)
+                    + "&sp=EgIQAQ%253D%253D";
+            c = (HttpURLConnection) new URL(u).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(8000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+            c.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
+            InputStream in = c.getInputStream();
+            StringBuilder sb = new StringBuilder();
+            byte[] buf = new byte[16384];
+            int n;
+            int total = 0;
+            while ((n = in.read(buf)) > 0 && total < 2000000) {
+                sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
+                total += n;
+            }
+            in.close();
+            Matcher m = Pattern.compile("\"videoId\":\"([A-Za-z0-9_-]{11})\"").matcher(sb);
+            if (m.find()) {
+                return m.group(1);
+            }
+        } catch (Exception e) {
+            // fall through
+        } finally {
+            if (c != null) {
+                c.disconnect();
+            }
+        }
+        return null;
+    }
+
+    private void playVideo(String id) {
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("vnd.youtube:" + id));
+        i.setPackage("com.google.android.youtube");
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            openUrl("https://www.youtube.com/watch?v=" + id, null);
+        }
     }
 
     private Runnable later(final String url, final String pkg) {
@@ -818,6 +966,7 @@ public class MahiService extends Service {
     @Override
     public void onDestroy() {
         running = false;
+        inst = null;
         handler.removeCallbacksAndMessages(null);
         stopVosk();
         if (recognizer != null) {
