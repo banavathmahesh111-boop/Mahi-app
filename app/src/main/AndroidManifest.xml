@@ -35,6 +35,19 @@
             android:name=".MahiService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".MahiAccess"
+            android:exported="false"
+            android:label="Mahi"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/mahi_access" />
+        </service>
     </application>
 
 </manifest>
