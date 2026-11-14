@@ -13,13 +13,15 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.ArrayDeque;
 import java.util.Locale;
 
-// Taps "Install" in the Play Store for Mahi. Only the Play Store is allowed (see mahi_access.xml).
+// Taps the app in the Play Store search results, then taps "Install" on its page.
+// Only the Play Store is allowed (see mahi_access.xml).
 public class MahiAccess extends AccessibilityService {
 
     static MahiAccess instance;
 
     private final Handler h = new Handler(Looper.getMainLooper());
-    private String label = null;
+    private String label = null;   // what Mahi says back, e.g. "x.com"
+    private String want = null;    // the name to look for, e.g. "x"
     private boolean searchMode = false;
     private boolean pressedResult = false;
     private int tries = 0;
@@ -51,15 +53,23 @@ public class MahiAccess extends AccessibilityService {
     public void onInterrupt() {
     }
 
-    // appName: the app to install. search: true when we opened a search instead of the app's page
+    // appName: what you said. search: true when we opened a search instead of the app's page
     void startInstall(String appName, boolean search) {
         label = appName;
+        want = cleanName(appName);
         searchMode = search;
         pressedResult = false;
         tries = 0;
         lastPkg = "";
         h.removeCallbacks(task);
         h.postDelayed(task, 3000);
+    }
+
+    // "x.com" -> "x", "Instagram app" -> "instagram"
+    private String cleanName(String s) {
+        String t = s.toLowerCase(Locale.ROOT).trim();
+        t = t.replace(".com", "").replace(".in", "").replace(".app", "").replace(" app", "");
+        return t.replaceAll("[^a-z0-9]", "");
     }
 
     private void step() {
@@ -100,7 +110,7 @@ public class MahiAccess extends AccessibilityService {
         MahiService.say(message);
     }
 
-    // Looks through the whole page. 1 = Install tapped, 2 = already installed, 0 = not found yet
+    // Looks through the app's page. 1 = Install tapped, 2 = already installed, 0 = not found yet
     private int findInstall(AccessibilityNodeInfo root) {
         if (root == null) {
             return 0;
@@ -130,36 +140,45 @@ public class MahiAccess extends AccessibilityService {
         return installed ? 2 : 0;
     }
 
-    // Search results: tap the first result that matches the app name (skips the search box at the top)
+    // Search results: first looks for an exact title (like "X"), then a short title that contains the name.
+    // The search box and the top of the screen are skipped.
     private boolean clickResult(AccessibilityNodeInfo root) {
-        if (root == null) {
+        if (root == null || want == null || want.length() == 0) {
             return false;
         }
-        String want = norm(label);
         int minTop = (int) (130 * getResources().getDisplayMetrics().density);
-        ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
-        q.add(root);
-        int seen = 0;
-        Rect r = new Rect();
-        while (!q.isEmpty() && seen < 800) {
-            AccessibilityNodeInfo n = q.poll();
-            seen++;
-            CharSequence t = n.getText();
-            if (t != null && !n.isEditable() && norm(t.toString()).contains(want)) {
-                String cls = n.getClassName() != null ? n.getClassName().toString() : "";
-                String id = n.getViewIdResourceName();
-                n.getBoundsInScreen(r);
-                boolean isSearchBar = cls.contains("EditText")
-                        || (id != null && id.toLowerCase(Locale.ROOT).contains("search"))
-                        || r.top < minTop;
-                if (!isSearchBar && tap(n)) {
-                    return true;
-                }
+        for (int pass = 1; pass <= 2; pass++) {
+            if (pass == 2 && want.length() < 4) {
+                break;
             }
-            for (int i = 0; i < n.getChildCount(); i++) {
-                AccessibilityNodeInfo c = n.getChild(i);
-                if (c != null) {
-                    q.add(c);
+            ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
+            q.add(root);
+            int seen = 0;
+            Rect r = new Rect();
+            while (!q.isEmpty() && seen < 800) {
+                AccessibilityNodeInfo n = q.poll();
+                seen++;
+                CharSequence t = n.getText();
+                if (t != null && !n.isEditable()) {
+                    String key = t.toString().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+                    boolean match = (pass == 1)
+                            ? key.equals(want)
+                            : (key.contains(want) && key.length() <= want.length() + 15);
+                    if (match) {
+                        n.getBoundsInScreen(r);
+                        String id = n.getViewIdResourceName();
+                        boolean searchBar = (id != null && id.toLowerCase(Locale.ROOT).contains("search"))
+                                || r.top < minTop;
+                        if (!searchBar && tap(n)) {
+                            return true;
+                        }
+                    }
+                }
+                for (int i = 0; i < n.getChildCount(); i++) {
+                    AccessibilityNodeInfo c = n.getChild(i);
+                    if (c != null) {
+                        q.add(c);
+                    }
                 }
             }
         }
@@ -194,9 +213,5 @@ public class MahiAccess extends AccessibilityService {
                 .addStroke(new GestureDescription.StrokeDescription(p, 0, 100))
                 .build();
         return dispatchGesture(g, null, null);
-    }
-
-    private String norm(String s) {
-        return s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 }
