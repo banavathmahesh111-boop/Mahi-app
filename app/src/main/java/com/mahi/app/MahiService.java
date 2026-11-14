@@ -74,8 +74,11 @@ public class MahiService extends Service {
     private static final String WAKE_PHRASE = "hey buddy";
     private static final String[] WAKE_WORDS = {"hey buddy", "hey body", "hey bud", "a buddy", "hey buddies"};
     private static final String WAKE_GRAMMAR = grammar();
-    private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip";
-    private static final String VOSK_DIR = "vosk-model-small-en-in-0.4";
+
+    // Bigger US English model (about 128 MB). Downloaded once, then works offline.
+    private static final String VOSK_URL = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip";
+    private static final String VOSK_DIR = "vosk-model-en-us-0.22-lgraph";
+
     private static final String CHANNEL = "mahi_listening";
     private static final int NOTE_ID = 7;
 
