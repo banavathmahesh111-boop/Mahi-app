@@ -679,8 +679,29 @@ public class MahiService extends Service {
         } else if (w.equals("hello") || w.equals("hi") || w.equals("hey")) {
             reply("Hello Mahesh. How can I help you?", null, 0);
         } else {
-            reply("I heard: " + said + ". I'm still learning that one.", null, 0);
+            // Anything else is a question for Gemini
+            askAi(said);
         }
+    }
+
+    // Sends the question to Gemini and speaks the answer
+    private void askAi(String said) {
+        String q = said.toLowerCase(Locale.ROOT)
+                .replace("hey buddy", "").replace("hey body", "").replace("hey bud", "").trim();
+        if (q.length() == 0) {
+            reply("Sorry, I didn't catch the question.", null, 0);
+            return;
+        }
+        push("thinking", "Thinking\u2026");
+        GeminiAi.ask(this, q, new GeminiAi.Done() {
+            public void onAnswer(final String text) {
+                handler.post(new Runnable() {
+                    public void run() {
+                        reply(text, null, 0);
+                    }
+                });
+            }
+        });
     }
 
     private String clean(String s, String... junk) {
