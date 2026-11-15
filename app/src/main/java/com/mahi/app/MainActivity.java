@@ -2,6 +2,8 @@ package com.mahi.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -10,6 +12,8 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
+import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -56,14 +60,34 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void onAction(final String name) {
-            if ("settings".equals(name)) {
-                runOnUiThread(new Runnable() {
-                    public void run() {
+            runOnUiThread(new Runnable() {
+                public void run() {
+                    if ("settings".equals(name)) {
                         toggleService();
+                    } else if ("menu".equals(name)) {
+                        showKeyDialog();
                     }
-                });
-            }
+                }
+            });
         }
+    }
+
+    // Opens a box to paste the Gemini key. It is saved only on this phone.
+    private void showKeyDialog() {
+        final EditText box = new EditText(this);
+        box.setHint("Paste your Gemini API key");
+        new AlertDialog.Builder(this)
+                .setTitle("Gemini key")
+                .setMessage("Paste your key from aistudio.google.com. It is saved only on this phone.")
+                .setView(box)
+                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int which) {
+                        GeminiAi.saveKey(MainActivity.this, box.getText().toString());
+                        Toast.makeText(MainActivity.this, "Key saved", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private boolean hasMic() {
