@@ -13,8 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import java.util.ArrayDeque;
 import java.util.Locale;
 
-// Taps the app in the Play Store search results, then taps "Install" on its page.
-// Only the Play Store is allowed (see mahi_access.xml).
+// Taps "Install" on the Play Store page for Mahi. Only the Play Store is allowed (see mahi_access.xml).
 public class MahiAccess extends AccessibilityService {
 
     static MahiAccess instance;
@@ -24,8 +23,9 @@ public class MahiAccess extends AccessibilityService {
     private String want = null;    // the name to look for, e.g. "x"
     private boolean searchMode = false;
     private boolean pressedResult = false;
+    private boolean sawInstall = false;
+    private boolean inPlayStore = false;
     private int tries = 0;
-    private String lastPkg = "";
 
     private final Runnable task = new Runnable() {
         public void run() {
@@ -59,10 +59,11 @@ public class MahiAccess extends AccessibilityService {
         want = cleanName(appName);
         searchMode = search;
         pressedResult = false;
+        sawInstall = false;
+        inPlayStore = false;
         tries = 0;
-        lastPkg = "";
         h.removeCallbacks(task);
-        h.postDelayed(task, 3000);
+        h.postDelayed(task, 2500);
     }
 
     // "x.com" -> "x", "Instagram app" -> "instagram"
@@ -78,28 +79,32 @@ public class MahiAccess extends AccessibilityService {
         }
         tries++;
         AccessibilityNodeInfo root = getRootInActiveWindow();
-        lastPkg = (root != null && root.getPackageName() != null) ? root.getPackageName().toString() : "";
-        if ("com.android.vending".equals(lastPkg)) {
+        String pkg = (root != null && root.getPackageName() != null) ? root.getPackageName().toString() : "";
+        inPlayStore = "com.android.vending".equals(pkg);
+        if (inPlayStore) {
+            // 1. Always look for the Install button first. It can be shown directly, without a search list.
+            int r = findInstall(root);
+            if (r == 1) {
+                finish("Tapped Install.");
+                return;
+            }
+            if (r == 2) {
+                finish(label + " is already installed.");
+                return;
+            }
+            // 2. If we are on search results, tap the app's name once
             if (searchMode && !pressedResult) {
                 if (clickResult(root)) {
                     pressedResult = true;
-                }
-            } else {
-                int r = findInstall(root);
-                if (r == 1) {
-                    finish("Tapped Install.");
-                    return;
-                }
-                if (r == 2) {
-                    finish(label + " is already installed.");
-                    return;
                 }
             }
         }
         if (tries < 60) {
             h.postDelayed(task, 1000);
-        } else if ("com.android.vending".equals(lastPkg)) {
-            finish("I found the Play Store but couldn't tap Install. Please tap it yourself.");
+        } else if (sawInstall) {
+            finish("I can see Install but couldn't tap it. Please tap it yourself.");
+        } else if (inPlayStore) {
+            finish("I found the Play Store but couldn't find Install. Please tap it yourself.");
         } else {
             finish("The Play Store did not open. Please open it and tap Install yourself.");
         }
@@ -110,7 +115,7 @@ public class MahiAccess extends AccessibilityService {
         MahiService.say(message);
     }
 
-    // Looks through the app's page. 1 = Install tapped, 2 = already installed, 0 = not found yet
+    // Looks through the page. 1 = Install tapped, 2 = already installed, 0 = not found yet
     private int findInstall(AccessibilityNodeInfo root) {
         if (root == null) {
             return 0;
@@ -123,7 +128,8 @@ public class MahiAccess extends AccessibilityService {
             AccessibilityNodeInfo n = q.poll();
             seen++;
             String t = textOf(n);
-            if (t.equals("install") && n.isVisibleToUser()) {
+            if (t.equals("install")) {
+                sawInstall = true;
                 if (tap(n)) {
                     return 1;
                 }
@@ -140,8 +146,8 @@ public class MahiAccess extends AccessibilityService {
         return installed ? 2 : 0;
     }
 
-    // Search results: first looks for an exact title (like "X"), then a short title that contains the name.
-    // The search box and the top of the screen are skipped.
+    // Search results: tap the first result whose title matches the app name.
+    // Pass 1 needs an exact title (like "X"). Pass 2 allows a short title that contains the name.
     private boolean clickResult(AccessibilityNodeInfo root) {
         if (root == null || want == null || want.length() == 0) {
             return false;
@@ -193,10 +199,11 @@ public class MahiAccess extends AccessibilityService {
         return (t == null) ? "" : t.toString().trim().toLowerCase(Locale.ROOT);
     }
 
-    // Taps a button: clicks it, or its nearest clickable parent, or taps its position on the screen
+    // Taps a node: clicks it or its nearest clickable parent (up to 4 levels),
+    // and if that fails, taps the middle of the node on the screen
     private boolean tap(AccessibilityNodeInfo n) {
         AccessibilityNodeInfo c = n;
-        for (int i = 0; i < 8 && c != null; i++) {
+        for (int i = 0; i < 4 && c != null; i++) {
             if (c.isClickable() && c.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
                 return true;
             }
@@ -210,7 +217,7 @@ public class MahiAccess extends AccessibilityService {
         Path p = new Path();
         p.moveTo(r.centerX(), r.centerY());
         GestureDescription g = new GestureDescription.Builder()
-                .addStroke(new GestureDescription.StrokeDescription(p, 0, 100))
+                .addStroke(new GestureDescription.StrokeDescription(p, 0, 120))
                 .build();
         return dispatchGesture(g, null, null);
     }
