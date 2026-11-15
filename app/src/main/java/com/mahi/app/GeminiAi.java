@@ -1,8 +1,11 @@
 package com.mahi.app;
 
 import android.content.Context;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -13,13 +16,30 @@ import java.nio.charset.StandardCharsets;
 // The key is typed into the app and saved on the phone only. It is never stored in this code.
 public class GeminiAi {
 
-    // If you get an error about the model, replace this with a model name from aistudio.google.com
-    private static final String MODEL = "gemini-flash-latest";
+    // Tried in order. If one model is not available, the next one is used.
+    private static final String[] MODELS = {
+            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3-flash-preview",
+            "gemini-2.5-flash-lite",
+            "gemini-flash-latest"
+    };
+
     private static final String PREFS = "mahi";
     private static final String KEY_NAME = "gemini_key";
 
     interface Done {
         void onAnswer(String text);
+    }
+
+    // An error sent back by Google, with its status code (for example 404 or 503)
+    static class HttpError extends Exception {
+        final int code;
+
+        HttpError(int code, String body) {
+            super("HTTP " + code + " " + body);
+            this.code = code;
+        }
     }
 
     static String getKey(Context c) {
@@ -42,12 +62,29 @@ public class GeminiAi {
     private static String call(Context c, String question) {
         String key = getKey(c);
         if (key.length() == 0) {
-            return "Please set your Gemini key first. Tap the menu button at the top left.";
+            return "Please add your Gemini key first. Tap the menu button at the top left.";
         }
-        HttpURLConnection conn = null;
+        String lastProblem = "no model answered";
+        for (String model : MODELS) {
+            try {
+                return clean(tryModel(model, key, question));
+            } catch (HttpError e) {
+                if (e.code == 400 || e.code == 401 || e.code == 403) {
+                    return "Google rejected your key, error " + e.code
+                            + ". Open the menu button and paste your key again.";
+                }
+                lastProblem = model + " gave error " + e.code;
+            } catch (Exception e) {
+                lastProblem = model + " failed: " + e.toString();
+            }
+        }
+        return "Gemini did not answer. " + lastProblem;
+    }
+
+    private static String tryModel(String model, String key, String question) throws Exception {
+        URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
-            URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent");
-            conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
             conn.setRequestMethod("POST");
@@ -67,29 +104,45 @@ public class GeminiAi {
 
             int code = conn.getResponseCode();
             InputStream in = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
-            StringBuilder sb = new StringBuilder();
-            byte[] buf = new byte[4096];
-            int n;
-            while (in != null && (n = in.read(buf)) > 0) {
-                sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
-            }
+            String text = readAll(in);
             if (code != 200) {
-                return "The AI service gave error " + code + ". Check your key in the menu.";
+                throw new HttpError(code, text);
             }
-            JSONObject res = new JSONObject(sb.toString());
-            String text = res.getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text");
-            text = text.replace("*", "").trim();
-            if (text.length() > 500) {
-                text = text.substring(0, 500);
+            JSONObject res = new JSONObject(text);
+            JSONArray parts = res.getJSONArray("candidates").getJSONObject(0)
+                    .getJSONObject("content").getJSONArray("parts");
+            StringBuilder answer = new StringBuilder();
+            for (int i = 0; i < parts.length(); i++) {
+                answer.append(parts.getJSONObject(i).optString("text", ""));
             }
-            return text;
-        } catch (Exception e) {
-            return "I couldn't reach the AI service. Please check the internet connection.";
+            if (answer.length() == 0) {
+                throw new Exception("empty answer");
+            }
+            return answer.toString();
         } finally {
-            if (conn != null) {
-                conn.disconnect();
-            }
+            conn.disconnect();
         }
+    }
+
+    private static String readAll(InputStream in) throws Exception {
+        if (in == null) {
+            return "";
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            out.write(buf, 0, n);
+        }
+        in.close();
+        return out.toString("UTF-8");
+    }
+
+    private static String clean(String text) {
+        String t = text.replace("*", "").replace("#", "").trim();
+        if (t.length() > 500) {
+            t = t.substring(0, 500);
+        }
+        return t;
     }
 }
