@@ -17,6 +17,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+
 public class MainActivity extends Activity {
     private WebView webView;
     private boolean pageReady = false;
@@ -40,7 +42,7 @@ public class MainActivity extends Activity {
         });
         webView.loadUrl("file:///android_asset/index.html");
         setContentView(webView);
-        if (hasMic()) {
+        if (allGranted()) {
             startMahi(null);
         } else {
             requestPerms();
@@ -95,13 +97,30 @@ public class MainActivity extends Activity {
                 || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void requestPerms() {
+    // Permissions Mahi asks for: microphone, phone calls, contacts, and notifications on newer phones
+    private String[] neededPerms() {
+        ArrayList<String> list = new ArrayList<>();
+        list.add(Manifest.permission.RECORD_AUDIO);
+        list.add(Manifest.permission.CALL_PHONE);
+        list.add(Manifest.permission.READ_CONTACTS);
         if (Build.VERSION.SDK_INT >= 33) {
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO,
-                    Manifest.permission.POST_NOTIFICATIONS}, PERM);
-        } else {
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, PERM);
+            list.add(Manifest.permission.POST_NOTIFICATIONS);
         }
+        return list.toArray(new String[0]);
+    }
+
+    // True when the three core permissions are already allowed
+    private boolean allGranted() {
+        if (Build.VERSION.SDK_INT < 23) {
+            return true;
+        }
+        return checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestPerms() {
+        requestPermissions(neededPerms(), PERM);
     }
 
     @Override
