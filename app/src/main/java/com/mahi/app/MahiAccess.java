@@ -1,202 +1,224 @@
 package com.mahi.app;
 
-import android.Manifest;
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.os.Build;
-import android.os.Bundle;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.EditText;
-import android.widget.Toast;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 
-import org.json.JSONObject;
+import java.util.ArrayDeque;
+import java.util.Locale;
 
-public class MainActivity extends Activity {
-    private WebView webView;
-    private boolean pageReady = false;
-    private String pendingAction = null;
-    private static final int PERM = 201;
+// Taps "Install" on the Play Store page for Mahi. Only the Play Store is allowed (see mahi_access.xml).
+public class MahiAccess extends AccessibilityService {
+
+    static MahiAccess instance;
+
+    private final Handler h = new Handler(Looper.getMainLooper());
+    private String label = null;   // what Mahi says back, e.g. "x.com"
+    private String want = null;    // the name to look for, e.g. "x"
+    private boolean searchMode = false;
+    private boolean pressedResult = false;
+    private boolean sawInstall = false;
+    private boolean inPlayStore = false;
+    private int tries = 0;
+
+    private final Runnable task = new Runnable() {
+        public void run() {
+            step();
+        }
+    };
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        webView = new WebView(this);
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        webView.addJavascriptInterface(new Bridge(), "Android");
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                pageReady = true;
-                display(MahiService.lastState, MahiService.lastText);
-            }
-        });
-        webView.loadUrl("file:///android_asset/index.html");
-        setContentView(webView);
-        if (hasMic()) {
-            startMahi(null);
-        } else {
-            requestPerms();
-        }
-    }
-
-    // Lets the page talk to the app
-    private class Bridge {
-        @JavascriptInterface
-        public void onMic() {
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    startMahi(MahiService.ACTION_TALK);
-                }
-            });
-        }
-
-        @JavascriptInterface
-        public void onAction(final String name) {
-            runOnUiThread(new Runnable() {
-                public void run() {
-                    if ("settings".equals(name)) {
-                        toggleService();
-                    } else if ("menu".equals(name)) {
-                        showKeyDialog();
-                    }
-                }
-            });
-        }
-    }
-
-    // Opens a box to paste the Gemini key. It is saved only on this phone.
-    private void showKeyDialog() {
-        final EditText box = new EditText(this);
-        box.setHint("Paste your Gemini API key");
-        new AlertDialog.Builder(this)
-                .setTitle("Gemini key")
-                .setMessage("Paste your key from aistudio.google.com. It is saved only on this phone.")
-                .setView(box)
-                .setPositiveButton("Save", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int which) {
-                        GeminiAi.saveKey(MainActivity.this, box.getText().toString());
-                        Toast.makeText(MainActivity.this, "Key saved", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private boolean hasMic() {
-        return Build.VERSION.SDK_INT < 23
-                || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPerms() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO,
-                    Manifest.permission.POST_NOTIFICATIONS}, PERM);
-        } else {
-            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, PERM);
-        }
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        instance = this;
     }
 
     @Override
-    public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
-        super.onRequestPermissionsResult(code, perms, results);
-        if (code == PERM) {
-            if (hasMic()) {
-                startMahi(pendingAction);
-            } else if (pageReady) {
-                display("idle", "Mic permission needed");
-            }
-            pendingAction = null;
-        }
+    public boolean onUnbind(Intent intent) {
+        instance = null;
+        return super.onUnbind(intent);
     }
 
-    private void startMahi(String action) {
-        if (!hasMic()) {
-            pendingAction = action;
-            requestPerms();
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+    }
+
+    @Override
+    public void onInterrupt() {
+    }
+
+    // appName: what you said. search: true when we opened a search instead of the app's page
+    void startInstall(String appName, boolean search) {
+        label = appName;
+        want = cleanName(appName);
+        searchMode = search;
+        pressedResult = false;
+        sawInstall = false;
+        inPlayStore = false;
+        tries = 0;
+        h.removeCallbacks(task);
+        h.postDelayed(task, 2500);
+    }
+
+    // "x.com" -> "x", "Instagram app" -> "instagram"
+    private String cleanName(String s) {
+        String t = s.toLowerCase(Locale.ROOT).trim();
+        t = t.replace(".com", "").replace(".in", "").replace(".app", "").replace(" app", "");
+        return t.replaceAll("[^a-z0-9]", "");
+    }
+
+    private void step() {
+        if (label == null) {
             return;
         }
-        Intent i = new Intent(this, MahiService.class);
-        if (action != null) {
-            i.setAction(action);
-        }
-        startForegroundService(i);
-    }
-
-    private void toggleService() {
-        if (MahiService.running) {
-            Intent i = new Intent(this, MahiService.class);
-            i.setAction(MahiService.ACTION_STOP);
-            startService(i);
-        } else {
-            startMahi(null);
-        }
-    }
-
-    private String label(String state) {
-        if ("listening".equals(state)) {
-            return "LISTENING";
-        } else if ("thinking".equals(state)) {
-            return "THINKING";
-        } else if ("speaking".equals(state)) {
-            return "SPEAKING";
-        }
-        return "READY";
-    }
-
-    // Shows the state (and the text, unless it is null) on the dashboard
-    private void display(String state, String text) {
-        if (text == null) {
-            webView.evaluateJavascript("document.body.dataset.state='" + state + "';"
-                    + "document.getElementById('sl').textContent='" + label(state) + "';", null);
-        } else {
-            webView.evaluateJavascript("setState('" + state + "');"
-                    + "document.getElementById('sm').textContent=" + JSONObject.quote(text) + ";", null);
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        MahiService.ui = new MahiService.Ui() {
-            public void show(String state, String text) {
-                if (pageReady) {
-                    display(state, text);
+        tries++;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        String pkg = (root != null && root.getPackageName() != null) ? root.getPackageName().toString() : "";
+        inPlayStore = "com.android.vending".equals(pkg);
+        if (inPlayStore) {
+            // 1. Always look for the Install button first. It can be shown directly, without a search list.
+            int r = findInstall(root);
+            if (r == 1) {
+                finish("Tapped Install.");
+                return;
+            }
+            if (r == 2) {
+                finish(label + " is already installed.");
+                return;
+            }
+            // 2. If we are on search results, tap the app's name once
+            if (searchMode && !pressedResult) {
+                if (clickResult(root)) {
+                    pressedResult = true;
                 }
             }
-        };
-        if (pageReady) {
-            display(MahiService.lastState, MahiService.lastText);
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        MahiService.ui = null;
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
+        if (tries < 60) {
+            h.postDelayed(task, 1000);
+        } else if (sawInstall) {
+            finish("I can see Install but couldn't tap it. Please tap it yourself.");
+        } else if (inPlayStore) {
+            finish("I found the Play Store but couldn't find Install. Please tap it yourself.");
         } else {
-            super.onBackPressed();
+            finish("The Play Store did not open. Please open it and tap Install yourself.");
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        if (webView != null) {
-            webView.destroy();
+    private void finish(String message) {
+        label = null;
+        MahiService.say(message);
+    }
+
+    // Looks through the page. 1 = Install tapped, 2 = already installed, 0 = not found yet
+    private int findInstall(AccessibilityNodeInfo root) {
+        if (root == null) {
+            return 0;
         }
-        super.onDestroy();
+        boolean installed = false;
+        ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
+        q.add(root);
+        int seen = 0;
+        while (!q.isEmpty() && seen < 1000) {
+            AccessibilityNodeInfo n = q.poll();
+            seen++;
+            String t = textOf(n);
+            if (t.equals("install")) {
+                sawInstall = true;
+                if (tap(n)) {
+                    return 1;
+                }
+            } else if (t.equals("open") || t.equals("uninstall")) {
+                installed = true;
+            }
+            for (int i = 0; i < n.getChildCount(); i++) {
+                AccessibilityNodeInfo c = n.getChild(i);
+                if (c != null) {
+                    q.add(c);
+                }
+            }
+        }
+        return installed ? 2 : 0;
+    }
+
+    // Search results: tap the first result whose title matches the app name.
+    // Pass 1 needs an exact title (like "X"). Pass 2 allows a short title that contains the name.
+    private boolean clickResult(AccessibilityNodeInfo root) {
+        if (root == null || want == null || want.length() == 0) {
+            return false;
+        }
+        int minTop = (int) (130 * getResources().getDisplayMetrics().density);
+        for (int pass = 1; pass <= 2; pass++) {
+            if (pass == 2 && want.length() < 4) {
+                break;
+            }
+            ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
+            q.add(root);
+            int seen = 0;
+            Rect r = new Rect();
+            while (!q.isEmpty() && seen < 800) {
+                AccessibilityNodeInfo n = q.poll();
+                seen++;
+                CharSequence t = n.getText();
+                if (t != null && !n.isEditable()) {
+                    String key = t.toString().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+                    boolean match = (pass == 1)
+                            ? key.equals(want)
+                            : (key.contains(want) && key.length() <= want.length() + 15);
+                    if (match) {
+                        n.getBoundsInScreen(r);
+                        String id = n.getViewIdResourceName();
+                        boolean searchBar = (id != null && id.toLowerCase(Locale.ROOT).contains("search"))
+                                || r.top < minTop;
+                        if (!searchBar && tap(n)) {
+                            return true;
+                        }
+                    }
+                }
+                for (int i = 0; i < n.getChildCount(); i++) {
+                    AccessibilityNodeInfo c = n.getChild(i);
+                    if (c != null) {
+                        q.add(c);
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private String textOf(AccessibilityNodeInfo n) {
+        CharSequence t = n.getText();
+        if (t == null || t.length() == 0) {
+            t = n.getContentDescription();
+        }
+        return (t == null) ? "" : t.toString().trim().toLowerCase(Locale.ROOT);
+    }
+
+    // Taps a node: clicks it or its nearest clickable parent (up to 4 levels),
+    // and if that fails, taps the middle of the node on the screen
+    private boolean tap(AccessibilityNodeInfo n) {
+        AccessibilityNodeInfo c = n;
+        for (int i = 0; i < 4 && c != null; i++) {
+            if (c.isClickable() && c.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                return true;
+            }
+            c = c.getParent();
+        }
+        Rect r = new Rect();
+        n.getBoundsInScreen(r);
+        if (r.width() <= 0 || r.height() <= 0) {
+            return false;
+        }
+        Path p = new Path();
+        p.moveTo(r.centerX(), r.centerY());
+        GestureDescription g = new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(p, 0, 120))
+                .build();
+        return dispatchGesture(g, null, null);
     }
 }
