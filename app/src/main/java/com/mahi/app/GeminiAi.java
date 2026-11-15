@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 public class GeminiAi {
 
     // If you get an error about the model, replace this with a model name from aistudio.google.com
-    private static final String MODEL = "gemini-2.0-flash";
+    private static final String MODEL = "gemini-flash-latest";
     private static final String PREFS = "mahi";
     private static final String KEY_NAME = "gemini_key";
 
