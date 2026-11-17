@@ -292,6 +292,9 @@ public class MahiService extends Service {
                         finishSpeaking();
                     }
                 });
+                // Warmer, slightly slower voice
+                tts.setPitch(1.05f);
+                tts.setSpeechRate(0.95f);
                 ttsReady = true;
             }
         });
@@ -682,6 +685,9 @@ public class MahiService extends Service {
         } else if (t.contains("what date") || t.contains("today's date") || t.contains("what day")) {
             reply("Today is " + new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(new Date()) + ".",
                     null, 0);
+        } else if (t.contains("forget") || t.contains("clear memory") || t.contains("new conversation")) {
+            GeminiAi.clearHistory(this);
+            reply("Okay, I've forgotten our earlier chat.", null, 0);
         } else if (w.equals("hello") || w.equals("hi") || w.equals("hey")) {
             reply("Hello Mahesh. How can I help you?", null, 0);
         } else {
