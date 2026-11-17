@@ -12,17 +12,19 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-// Mahi's AI brain: answers questions, remembers the recent conversation, and can look up live information.
+// Mahi's AI brain, now powered by xAI Grok.
+// This file keeps its old name so the other Mahi files don't need changes.
 // The key is typed into the app and saved on the phone only. It is never stored in this code.
 public class GeminiAi {
 
-    // Tried in order. If one model is not available, the next one is used.
+    private static final String ENDPOINT = "https://api.x.ai/v1/chat/completions";
+
+    // Tried in order. If one model name is not available, the next one is used.
     private static final String[] MODELS = {
-            "gemini-2.5-flash",
-            "gemini-3.5-flash",
-            "gemini-3-flash-preview",
-            "gemini-2.5-flash-lite",
-            "gemini-flash-latest"
+            "grok-4.7",
+            "grok-4.5",
+            "grok-4-0709",
+            "grok-3"
     };
 
     private static final String PERSONALITY =
@@ -31,19 +33,18 @@ public class GeminiAi {
             + "Remember what was said earlier in this conversation and use it naturally. "
             + "Show feelings: be happy to help, caring when Mahesh sounds sad or stressed, and excited for good news. "
             + "Keep every reply short, one to three sentences, because it will be read aloud. "
-            + "Speak in plain sentences only: no markdown, no lists, no emojis, no web links. "
-            + "When you use current information from a web search, just say the answer simply.";
+            + "Speak in plain sentences only: no markdown, no lists, no emojis, no web links.";
 
     private static final String PREFS = "mahi";
     private static final String KEY_NAME = "gemini_key";
-    private static final String HISTORY_NAME = "chat_history";
+    private static final String HISTORY_NAME = "grok_history";
     private static final int MAX_MESSAGES = 12; // the last 12 messages (6 exchanges) are remembered
 
     interface Done {
         void onAnswer(String text);
     }
 
-    // An error sent back by Google, with its status code and message
+    // An error sent back by xAI, with its status code and message
     static class HttpError extends Exception {
         final int code;
         final String body;
@@ -86,68 +87,54 @@ public class GeminiAi {
     private static String call(Context c, String question) throws Exception {
         String key = getKey(c);
         if (key.length() == 0) {
-            return "Please add your Gemini key first. Tap the menu button at the top left.";
+            return "Please add your key first. Tap the menu button at the top left.";
         }
 
-        // Earlier messages plus this question
         JSONArray history = loadHistory(c);
-        JSONArray contents = new JSONArray(history.toString());
-        contents.put(turn("user", question));
-
         String lastProblem = "no model answered";
         for (String model : MODELS) {
             try {
-                String answer = clean(askModel(model, key, contents));
+                String answer = clean(send(model, key, history, question));
                 saveHistory(c, history, question, answer);
                 return answer;
             } catch (HttpError e) {
-                if (isKeyError(e)) {
-                    return "Google rejected your key, error " + e.code
-                            + ". Open the menu button and paste your key again.";
+                if (e.code == 401) {
+                    return "Grok rejected your key, error 401. Open the menu button and paste your key again.";
                 }
-                lastProblem = model + " gave error " + e.code;
+                if (e.code == 403) {
+                    return "Grok refused the request, error 403. Check your key and credits at console.x.ai.";
+                }
+                lastProblem = model + " gave error " + e.code + ". " + shortText(e.body);
             } catch (Exception e) {
                 lastProblem = model + " failed: " + e.toString();
             }
         }
-        return "Gemini did not answer. " + lastProblem;
+        return "Grok did not answer. " + lastProblem;
     }
 
-    private static boolean isKeyError(HttpError e) {
-        return e.code == 401 || e.code == 403 || (e.code == 400 && e.body.contains("API key"));
-    }
-
-    // Asks one model. If it refuses the web search tool, asks again without it.
-    private static String askModel(String model, String key, JSONArray contents) throws Exception {
-        try {
-            return send(model, key, contents, true);
-        } catch (HttpError e) {
-            if (e.code == 400 && !isKeyError(e)) {
-                return send(model, key, contents, false);
-            }
-            throw e;
+    private static String send(String model, String key, JSONArray history, String question) throws Exception {
+        // System instruction, then the remembered conversation, then this question
+        JSONArray messages = new JSONArray();
+        messages.put(turn("system", PERSONALITY));
+        for (int i = 0; i < history.length(); i++) {
+            messages.put(history.get(i));
         }
-    }
+        messages.put(turn("user", question));
 
-    private static String send(String model, String key, JSONArray contents, boolean useSearch) throws Exception {
-        URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        JSONObject body = new JSONObject()
+                .put("model", model)
+                .put("messages", messages)
+                .put("max_tokens", 300)
+                .put("temperature", 0.7);
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
         try {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
             conn.setRequestMethod("POST");
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("x-goog-api-key", key);
-
-            JSONObject system = new JSONObject()
-                    .put("parts", new JSONArray().put(new JSONObject().put("text", PERSONALITY)));
-            JSONObject body = new JSONObject()
-                    .put("systemInstruction", system)
-                    .put("contents", contents);
-            if (useSearch) {
-                body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
-            }
+            conn.setRequestProperty("Authorization", "Bearer " + key);
 
             OutputStream os = conn.getOutputStream();
             os.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -160,16 +147,13 @@ public class GeminiAi {
                 throw new HttpError(code, text);
             }
 
-            JSONArray parts = new JSONObject(text).getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts");
-            StringBuilder answer = new StringBuilder();
-            for (int i = 0; i < parts.length(); i++) {
-                answer.append(parts.getJSONObject(i).optString("text", ""));
-            }
+            JSONObject msg = new JSONObject(text).getJSONArray("choices").getJSONObject(0)
+                    .getJSONObject("message");
+            String answer = msg.optString("content", "").trim();
             if (answer.length() == 0) {
                 throw new Exception("empty answer");
             }
-            return answer.toString();
+            return answer;
         } finally {
             conn.disconnect();
         }
@@ -188,7 +172,7 @@ public class GeminiAi {
     private static void saveHistory(Context c, JSONArray old, String question, String answer) throws Exception {
         JSONArray all = new JSONArray(old.toString());
         all.put(turn("user", question));
-        all.put(turn("model", answer));
+        all.put(turn("assistant", answer));
         JSONArray kept = new JSONArray();
         int start = Math.max(0, all.length() - MAX_MESSAGES);
         for (int i = start; i < all.length(); i++) {
@@ -199,9 +183,7 @@ public class GeminiAi {
     }
 
     private static JSONObject turn(String role, String text) throws Exception {
-        return new JSONObject()
-                .put("role", role)
-                .put("parts", new JSONArray().put(new JSONObject().put("text", text)));
+        return new JSONObject().put("role", role).put("content", text);
     }
 
     private static String readAll(InputStream in) throws Exception {
@@ -216,6 +198,13 @@ public class GeminiAi {
         }
         in.close();
         return out.toString("UTF-8");
+    }
+
+    private static String shortText(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() > 120 ? s.substring(0, 120) : s;
     }
 
     private static String clean(String text) {
