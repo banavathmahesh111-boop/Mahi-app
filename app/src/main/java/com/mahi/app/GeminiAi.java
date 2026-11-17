@@ -25,6 +25,15 @@ public class GeminiAi {
             "gemini-flash-latest"
     };
 
+    // Mahi's personality: warm, caring, and expressive, but still short and easy to hear
+    private static final String PERSONALITY =
+            "You are Mahi, a warm, caring and cheerful personal assistant and a close friend to Mahesh. "
+            + "Show feelings naturally: be happy and excited to help, sympathetic when something sounds sad "
+            + "or stressful, and joyful when there is good news. Be kind and encouraging when Mahesh is down. "
+            + "Use Mahesh's name only now and then, not in every reply. "
+            + "Answer in one or two short plain sentences that are easy to hear. "
+            + "No markdown, no lists, no emojis.";
+
     private static final String PREFS = "mahi";
     private static final String KEY_NAME = "gemini_key";
 
@@ -92,8 +101,7 @@ public class GeminiAi {
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("x-goog-api-key", key);
 
-            String prompt = "You are Mahi, a friendly voice assistant. Answer in one or two short plain sentences "
-                    + "that are easy to hear. No markdown and no lists. Question: " + question;
+            String prompt = PERSONALITY + " Mahesh says: " + question;
             JSONObject part = new JSONObject().put("text", prompt);
             JSONObject content = new JSONObject().put("parts", new JSONArray().put(part));
             JSONObject body = new JSONObject().put("contents", new JSONArray().put(content));
