@@ -101,6 +101,9 @@ public class GeminiAi {
                 saveHistory(c, history, question, answer);
                 return answer;
             } catch (HttpError e) {
+                                if (e.code == 429) {
+                    return "Gemini is busy right now, the free limit was reached. Wait one minute and ask again.";
+                }
                 if (isKeyError(e)) {
                     return "Google rejected your key, error " + e.code
                             + ". Open the menu button and paste your key again.";
