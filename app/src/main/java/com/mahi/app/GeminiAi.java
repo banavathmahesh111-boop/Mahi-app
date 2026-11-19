@@ -12,16 +12,14 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-// Mahi's AI brain: answers questions, remembers the recent conversation, and can look up live information.
+// Mahi's AI brain, powered by Google Gemini only.
 // The key is typed into the app and saved on the phone only. It is never stored in this code.
 public class GeminiAi {
 
-    // Tried in order. If one model is not available, the next one is used.
+    // Tried in order. The lite model comes first because it usually has a larger free daily limit.
     private static final String[] MODELS = {
-            "gemini-2.5-flash",
-            "gemini-3.5-flash",
-            "gemini-3-flash-preview",
             "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
             "gemini-flash-latest"
     };
 
@@ -31,13 +29,12 @@ public class GeminiAi {
             + "Remember what was said earlier in this conversation and use it naturally. "
             + "Show feelings: be happy to help, caring when Mahesh sounds sad or stressed, and excited for good news. "
             + "Keep every reply short, one to three sentences, because it will be read aloud. "
-            + "Speak in plain sentences only: no markdown, no lists, no emojis, no web links. "
-            + "When you use current information from a web search, just say the answer simply.";
+            + "Speak in plain sentences only: no markdown, no lists, no emojis, no web links.";
 
     private static final String PREFS = "mahi";
     private static final String KEY_NAME = "gemini_key";
-    private static final String HISTORY_NAME = "chat_history";
-    private static final int MAX_MESSAGES = 12; // the last 12 messages (6 exchanges) are remembered
+    private static final String HISTORY_NAME = "gemini_history";
+    private static final int MAX_MESSAGES = 12;
 
     interface Done {
         void onAnswer(String text);
@@ -89,26 +86,23 @@ public class GeminiAi {
             return "Please add your Gemini key first. Tap the menu button at the top left.";
         }
 
-        // Earlier messages plus this question
         JSONArray history = loadHistory(c);
-        JSONArray contents = new JSONArray(history.toString());
-        contents.put(turn("user", question));
-
         String lastProblem = "no model answered";
         for (String model : MODELS) {
             try {
-                String answer = clean(askModel(model, key, contents));
+                String answer = clean(askModel(model, key, history, question));
                 saveHistory(c, history, question, answer);
                 return answer;
             } catch (HttpError e) {
-                                if (e.code == 429) {
-                    return "Gemini is busy right now, the free limit was reached. Wait one minute and ask again.";
-                }
                 if (isKeyError(e)) {
                     return "Google rejected your key, error " + e.code
                             + ". Open the menu button and paste your key again.";
                 }
-                lastProblem = model + " gave error " + e.code;
+                if (e.code == 429) {
+                    return "Gemini is busy right now, the free limit was reached. "
+                            + "Wait a minute, or turn on billing for your project.";
+                }
+                lastProblem = model + " gave error " + e.code + ". " + shortText(e.body);
             } catch (Exception e) {
                 lastProblem = model + " failed: " + e.toString();
             }
@@ -120,19 +114,36 @@ public class GeminiAi {
         return e.code == 401 || e.code == 403 || (e.code == 400 && e.body.contains("API key"));
     }
 
-    // Asks one model. If it refuses the web search tool, asks again without it.
-    private static String askModel(String model, String key, JSONArray contents) throws Exception {
+    // Asks one model with web search. If the search is refused or over its limit, asks again without it.
+    private static String askModel(String model, String key, JSONArray history, String question) throws Exception {
         try {
-            return send(model, key, contents, true);
+            return send(model, key, history, question, true);
         } catch (HttpError e) {
-            if (e.code == 400 && !isKeyError(e)) {
-                return send(model, key, contents, false);
+            if (!isKeyError(e) && (e.code == 400 || e.code == 429)) {
+                return send(model, key, history, question, false);
             }
             throw e;
         }
     }
 
-    private static String send(String model, String key, JSONArray contents, boolean useSearch) throws Exception {
+    private static String send(String model, String key, JSONArray history, String question, boolean useSearch)
+            throws Exception {
+        // The conversation so far, then this question
+        JSONArray contents = new JSONArray();
+        for (int i = 0; i < history.length(); i++) {
+            contents.put(history.get(i));
+        }
+        contents.put(turn("user", question));
+
+        JSONObject body = new JSONObject()
+                .put("systemInstruction", new JSONObject()
+                        .put("parts", new JSONArray().put(new JSONObject().put("text", PERSONALITY))))
+                .put("contents", contents)
+                .put("generationConfig", new JSONObject().put("maxOutputTokens", 300).put("temperature", 0.7));
+        if (useSearch) {
+            body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
+        }
+
         URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
@@ -142,15 +153,6 @@ public class GeminiAi {
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("x-goog-api-key", key);
-
-            JSONObject system = new JSONObject()
-                    .put("parts", new JSONArray().put(new JSONObject().put("text", PERSONALITY)));
-            JSONObject body = new JSONObject()
-                    .put("systemInstruction", system)
-                    .put("contents", contents);
-            if (useSearch) {
-                body.put("tools", new JSONArray().put(new JSONObject().put("google_search", new JSONObject())));
-            }
 
             OutputStream os = conn.getOutputStream();
             os.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -219,6 +221,13 @@ public class GeminiAi {
         }
         in.close();
         return out.toString("UTF-8");
+    }
+
+    private static String shortText(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() > 120 ? s.substring(0, 120) : s;
     }
 
     private static String clean(String text) {
