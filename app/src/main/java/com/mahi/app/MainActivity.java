@@ -97,11 +97,13 @@ public class MainActivity extends Activity {
                 || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
     }
 
-    // Permissions Mahi asks for: microphone, phone calls, contacts, and notifications on newer phones
+    // Permissions Mahi asks for: microphone, phone calls, answering calls, contacts,
+    // and notifications on newer phones
     private String[] neededPerms() {
         ArrayList<String> list = new ArrayList<>();
         list.add(Manifest.permission.RECORD_AUDIO);
         list.add(Manifest.permission.CALL_PHONE);
+        list.add(Manifest.permission.ANSWER_PHONE_CALLS);
         list.add(Manifest.permission.READ_CONTACTS);
         if (Build.VERSION.SDK_INT >= 33) {
             list.add(Manifest.permission.POST_NOTIFICATIONS);
@@ -109,13 +111,14 @@ public class MainActivity extends Activity {
         return list.toArray(new String[0]);
     }
 
-    // True when the three core permissions are already allowed
+    // True when the core permissions are already allowed
     private boolean allGranted() {
         if (Build.VERSION.SDK_INT < 23) {
             return true;
         }
         return checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
     }
 
