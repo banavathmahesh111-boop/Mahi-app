@@ -606,6 +606,7 @@ public class MahiService extends Service {
     // Drops anything said before the command word, e.g. "ye badi open whatsapp" -> "open whatsapp"
     private String cutToCommand(String t) {
         String[] verbs = {"open ", "launch ", "start ", "play ", "install ", "download ", "call ", "dial ",
+                "answer", "pick up", "decline", "reject", "hang up", "end call",
                 "stop", "pause", "resume", "continue", "next", "skip", "previous", "what time", "what date",
                 "what day", "today's date", "go to sleep", "hello", "sleep", "mic off"};
         int best = -1;
@@ -643,6 +644,13 @@ public class MahiService extends Service {
         } else if (t.contains("previous") || t.contains("last song")) {
             musicWasPlaying = false;
             reply("Previous song.", media(KeyEvent.KEYCODE_MEDIA_PREVIOUS), 300);
+        } else if (t.equals("answer") || t.contains("answer the call") || t.contains("answer call")
+                || t.contains("pick up")) {
+            reply(MahiCalls.answer(this), null, 0);
+        } else if (t.equals("decline") || t.equals("reject") || t.equals("hang up")
+                || (t.contains("call") && (t.contains("decline") || t.contains("reject")
+                || t.contains("end") || t.contains("hang") || t.contains("cut")))) {
+            reply(MahiCalls.endCall(this), null, 0);
         } else if (t.startsWith("call ") || t.startsWith("dial ")) {
             if (blocked()) {
                 return;
