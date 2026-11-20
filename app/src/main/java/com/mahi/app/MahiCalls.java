@@ -7,10 +7,11 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.ContactsContract;
+import android.telecom.TelecomManager;
 
 import java.util.Locale;
 
-// Makes phone calls by voice: "call mom" finds the contact, "call 9876543210" dials the number.
+// Phone features by voice: call a contact, answer a ringing call, and decline or end a call.
 public class MahiCalls {
 
     // Makes the call and returns the sentence Mahi should say
@@ -34,6 +35,36 @@ public class MahiCalls {
             return "I couldn't find " + who + " in your contacts.";
         }
         return place(c, found[1], found[0]);
+    }
+
+    // Answers a call that is ringing
+    static String answer(Context c) {
+        if (c.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
+            return "I need the Phone permission to answer calls. Please allow Phone for Mahi in Settings.";
+        }
+        try {
+            TelecomManager tm = (TelecomManager) c.getSystemService(Context.TELECOM_SERVICE);
+            tm.acceptRingingCall();
+            return "Answering the call.";
+        } catch (Exception e) {
+            return "I couldn't answer the call.";
+        }
+    }
+
+    // Declines a call that is ringing, or ends the call that is running
+    static String endCall(Context c) {
+        if (c.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
+            return "I need the Phone permission to end calls. Please allow Phone for Mahi in Settings.";
+        }
+        try {
+            TelecomManager tm = (TelecomManager) c.getSystemService(Context.TELECOM_SERVICE);
+            if (tm.endCall()) {
+                return "Call ended.";
+            }
+            return "There is no call to end.";
+        } catch (Exception e) {
+            return "I couldn't end the call.";
+        }
     }
 
     // Looks for an exact name first, then a name that contains the spoken name
