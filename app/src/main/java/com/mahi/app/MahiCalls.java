@@ -5,9 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.provider.ContactsContract;
 import android.telecom.TelecomManager;
+import android.view.KeyEvent;
 
 import java.util.Locale;
 
@@ -37,18 +39,34 @@ public class MahiCalls {
         return place(c, found[1], found[0]);
     }
 
-    // Answers a call that is ringing
-    static String answer(Context c) {
+    // Answers a ringing call. Checks after a moment and reports the result by voice.
+    static String answer(final Context c) {
         if (c.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
             return "I need the Phone permission to answer calls. Please allow Phone for Mahi in Settings.";
         }
+        final AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
         try {
             TelecomManager tm = (TelecomManager) c.getSystemService(Context.TELECOM_SERVICE);
             tm.acceptRingingCall();
-            return "Answering the call.";
         } catch (Exception e) {
-            return "I couldn't answer the call.";
+            // the headset button below is the backup
         }
+        new Thread(new Runnable() {
+            public void run() {
+                pause(1500);
+                if (am.getMode() == AudioManager.MODE_RINGTONE) {
+                    pressHeadsetButton(c);
+                    pause(1500);
+                }
+                int mode = am.getMode();
+                if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION) {
+                    MahiService.say("Call connected.");
+                } else {
+                    MahiService.say("I couldn't connect the call. Please tap answer on the phone.");
+                }
+            }
+        }).start();
+        return "Answering the call.";
     }
 
     // Declines a call that is ringing, or ends the call that is running
@@ -64,6 +82,26 @@ public class MahiCalls {
             return "There is no call to end.";
         } catch (Exception e) {
             return "I couldn't end the call.";
+        }
+    }
+
+    // Presses the headset button, which answers calls on many Android phones
+    private static void pressHeadsetButton(Context c) {
+        try {
+            AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+            long now = android.os.SystemClock.uptimeMillis();
+            am.dispatchMediaKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_HEADSETHOOK, 0));
+            am.dispatchMediaKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_HEADSETHOOK, 0));
+        } catch (Exception e) {
+            // nothing else to try
+        }
+    }
+
+    private static void pause(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            // carry on
         }
     }
 
